@@ -23,7 +23,7 @@ const METODOS={efectivo:"Efectivo",tarjeta:"Tarjeta",transferencia:"Transferenci
 const BIZ_PHONE="282 104 8780";
 const sortSizes=a=>a.slice().sort((x,y)=>(parseFloat(x)-parseFloat(y))||String(x).localeCompare(String(y)));
 
-const state={user:null,modelos:[],pedidos:[],mode:"loading",view:"ventas",filter:"todos",catFilter:"todos",debtFilter:"todos",qd:"",qp:"",qc:"",openId:null,payType:"abono",repMes:today().slice(0,7)};
+const state={user:null,modelos:[],pedidos:[],mode:"loading",view:"ventas",filter:"todos",catFilter:"todos",debtFilter:"todos",qd:"",acctKey:null,qp:"",qc:"",openId:null,payType:"abono",repMes:today().slice(0,7)};
 
 /* ================= Firebase ================= */
 let fs=null,auth=null,unsubs=[];
@@ -108,7 +108,7 @@ function render(){
   $("#sync").innerHTML=state.mode==="db"?(navigator.onLine?"<b>● En línea</b>":"<b>Sin conexión</b> · se sube al volver"):"<b>Cargando…</b>";
   const lateN=state.pedidos.filter(p=>calc(p).late).length;
   $$("[data-late]").forEach(b=>{b.hidden=!lateN;b.textContent=lateN});
-  const debtN=new Set(state.pedidos.filter(p=>calc(p).saldo>0).map(p=>(p.cliente||"").trim().toLowerCase())).size;
+  const debtN=cuentas(true).length;
   $$("[data-debt]").forEach(b=>{b.hidden=!debtN;b.textContent=debtN});
   const dis=state.mode==="loading";["#btn-contado","#btn-apartado","#btn-new-model","#btn-deuda"].forEach(s=>$(s).disabled=dis);
   $$(".xlsx-btn").forEach(b=>b.disabled=dis);
@@ -116,6 +116,7 @@ function render(){
   if(v==="deudores")renderDebts();
   if(v==="catalogo")renderCatalog();
   if(v==="reportes")renderReport();
+  if(state.acctKey&&$("#ov-acct").classList.contains("open"))renderAcct();
   if(state.openId)renderDetail();
 }
 function renderStats(){
@@ -173,32 +174,89 @@ function renderCatalog(){
 
 /* ================= Deudores ================= */
 function lastPay(p){const ms=movsSorted(p).filter(m=>m.tipo!=="resta");const d=ms.filter(m=>m.fecha);return d.length?d[d.length-1]:ms.length?ms[ms.length-1]:null}
+const normName=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").trim().toLowerCase().replace(/\s+/g," ");
+/* Cuentas: todos los pedidos de una misma persona (mismo nombre) juntos */
+function cuentas(onlyDebt){const map=new Map();
+  for(const p of state.pedidos){const c=calc(p);if(onlyDebt&&!(c.saldo>0))continue;const k=normName(p.cliente)||"sin-nombre";
+    if(!map.has(k))map.set(k,{key:k,nombre:(p.cliente||"Sin nombre").trim(),tel:"",items:[],saldo:0,pagado:0,total:0,late:false,anterior:false,prox:""});
+    const g=map.get(k);g.items.push({p,c});if(p.telefono&&!g.tel)g.tel=p.telefono;g.saldo+=Math.max(c.saldo,0);g.pagado+=c.pagado;g.total+=c.total;
+    if(c.late)g.late=true;if(p.anterior)g.anterior=true;if(c.saldo>0&&p.proximoPago&&(!g.prox||p.proximoPago<g.prox))g.prox=p.proximoPago}
+  for(const g of map.values()){g.items.sort((x,y)=>(x.p.fecha||"").localeCompare(y.p.fecha||"")||num(x.p.numero)-num(y.p.numero));g.saldo=Math.round(g.saldo*100)/100}
+  return [...map.values()]}
+function cuentaPend(key){return cuentas(true).find(g=>g.key===key)}
+function itemName(p){return (p.modelo||"Sin modelo")+(p.talla?" · T. "+p.talla:"")}
 function renderDebts(){
-  const all=state.pedidos.map(p=>({p,c:calc(p)})).filter(x=>x.c.saldo>0);
-  const personas=new Set(all.map(x=>(x.p.cliente||"").trim().toLowerCase())).size;
-  const total=all.reduce((a,x)=>a+x.c.saldo,0),lateN=all.filter(x=>x.c.late).length,ant=all.filter(x=>x.p.anterior).reduce((a,x)=>a+x.c.saldo,0);
-  $("#debt-stats").innerHTML='<div class="stat"><small>Personas que deben</small><strong class="num">'+personas+'</strong></div><div class="stat alert"><small>Total por cobrar</small><strong class="num">'+money(total)+'</strong></div><div class="stat warn"><small>Atrasados</small><strong class="num">'+lateN+'</strong></div><div class="stat"><small>De deudas anteriores</small><strong class="num">'+money(ant)+'</strong></div>';
+  const gs=cuentas(true);
+  const total=gs.reduce((a,g)=>a+g.saldo,0),lateN=gs.filter(g=>g.late).length;
+  const ant=gs.reduce((a,g)=>a+g.items.filter(x=>x.p.anterior).reduce((s,x)=>s+x.c.saldo,0),0);
+  $("#debt-stats").innerHTML='<div class="stat"><small>Personas que deben</small><strong class="num">'+gs.length+'</strong></div><div class="stat alert"><small>Total por cobrar</small><strong class="num">'+money(total)+'</strong></div><div class="stat warn"><small>Personas atrasadas</small><strong class="num">'+lateN+'</strong></div><div class="stat"><small>De deudas anteriores</small><strong class="num">'+money(ant)+'</strong></div>';
   const el=$("#debts");
   if(state.mode==="loading"){el.innerHTML='<div class="empty">Cargando…</div>';return}
-  if(!all.length){el.innerHTML='<div class="empty"><strong>Nadie te debe</strong>Aquí aparecen los apartados con saldo pendiente. Si alguien ya te debía antes de usar la app, regístralo con "Registrar deuda anterior".<button class="btn primary" data-act="deuda">+ Registrar deuda anterior</button></div>';return}
+  if(!gs.length){el.innerHTML='<div class="empty"><strong>Nadie te debe</strong>Aquí aparecen las personas con saldo pendiente. Si alguien ya te debía antes de usar la app, regístralo con "Registrar deuda anterior".<button class="btn primary" data-act="deuda">+ Registrar deuda anterior</button></div>';return}
   const q=state.qd.trim().toLowerCase();
-  const list=all.filter(({p,c})=>{
-    if(state.debtFilter==="late"&&!c.late)return false;
-    if(state.debtFilter==="anterior"&&!p.anterior)return false;
-    return !q||[p.cliente,p.telefono,digits(p.telefono),p.modelo,p.talla].join(" ").toLowerCase().includes(q)})
-   .sort((a,b)=>(b.c.late-a.c.late)||(a.p.cliente||"").localeCompare(b.p.cliente||"")||(b.c.saldo-a.c.saldo));
+  const list=gs.filter(g=>{
+    if(state.debtFilter==="late"&&!g.late)return false;
+    if(state.debtFilter==="anterior"&&!g.anterior)return false;
+    return !q||[g.nombre,g.tel,digits(g.tel),...g.items.map(x=>x.p.modelo+" "+x.p.talla)].join(" ").toLowerCase().includes(q)})
+   .sort((x,y)=>(y.late-x.late)||x.nombre.localeCompare(y.nombre));
   if(!list.length){el.innerHTML='<div class="empty">Nadie coincide con la búsqueda o el filtro.</div>';return}
-  const sum=list.reduce((a,x)=>a+x.c.saldo,0);
-  el.innerHTML='<div class="debt-head"><span>Persona</span><span>Modelo</span><span>Precio</span><span>Abonado</span><span>Último abono</span><span>Debe</span></div>'+
-    list.map(({p,c})=>{const lp=lastPay(p);return '<button class="debt'+(c.late?' late':'')+'" data-open="'+esc(p.id)+'">'+
-      '<span class="who"><b>'+esc(p.cliente||"Sin nombre")+'</b><span class="meta">'+(p.telefono?esc(fphone(p.telefono)):'')+(c.late?' <span class="pill late">Atrasado</span>':p.proximoPago?' · Próx. '+esc(fdate(p.proximoPago)):'')+(p.anterior?' <span class="pill del">Anterior</span>':'')+'</span></span>'+
-      '<span class="mod"><span class="k">Modelo</span>'+esc(p.modelo||"Sin modelo")+(p.talla?' <span class="meta">· T. '+esc(p.talla)+'</span>':'')+'</span>'+
-      '<span class="r num"><span class="k">Precio</span>'+money(c.total)+'</span>'+
-      '<span class="r num"><span class="k">Abonado</span>'+money(c.pagado)+'</span>'+
-      '<span class="r num"><span class="k">Último abono</span>'+(lp?(lp.fecha?esc(fdate(lp.fecha)):'<span class="meta">Sin fecha</span>')+'<br><span class="meta">'+money(lp.monto)+'</span>':'<span class="meta">Sin abonos</span>')+'</span>'+
-      '<span class="r"><span class="k">Debe</span><span class="saldo num">'+money(c.saldo)+'</span></span>'+
-    '</button>'}).join("")+
-    '<div class="debt-total"><span>'+list.length+(list.length===1?' deuda':' deudas')+'</span><span class="num">Total: '+money(sum)+'</span></div>'}
+  const sum=list.reduce((a,g)=>a+g.saldo,0);
+  el.innerHTML=list.map(g=>{const multi=g.items.length>1;return '<article class="acct'+(g.late?' late':'')+'">'+
+    '<div class="acct-head"><div><b class="acct-name">'+esc(g.nombre)+'</b><span class="meta">'+(g.tel?esc(fphone(g.tel))+' · ':'')+g.items.length+(multi?' artículos':' artículo')+(g.late?' <span class="pill late">Atrasado</span>':g.prox?' · Próx. '+esc(fdate(g.prox)):'')+(g.anterior?' <span class="pill del">Anterior</span>':'')+'</span></div>'+
+      '<div class="acct-debe"><small>Debe</small><span class="num">'+money(g.saldo)+'</span></div></div>'+
+    '<div class="acct-rows"><div class="acct-row acct-rh"><span>Artículo</span><span>Precio</span><span>Abonado</span><span>Debe</span></div>'+
+      g.items.map(({p,c})=>{const lp=lastPay(p);return '<button class="acct-row" data-open="'+esc(p.id)+'"><span>'+esc(itemName(p))+'<br><span class="meta">'+(lp?'Últ. abono '+(lp.fecha?esc(fdate(lp.fecha)):'sin fecha')+' · '+money(lp.monto):'Sin abonos')+'</span></span><span class="num">'+money(c.total)+'</span><span class="num">'+money(c.pagado)+'</span><span class="num" style="color:#FF8A8E;font-weight:700">'+money(c.saldo)+'</span></button>'}).join("")+
+      (multi?'<div class="acct-row acct-tot"><span>Total</span><span class="num">'+money(g.total)+'</span><span class="num">'+money(g.pagado)+'</span><span class="num">'+money(g.saldo)+'</span></div>':'')+'</div>'+
+    '<div class="acct-actions"><button class="btn primary small" data-acct="'+esc(g.key)+'">Abonar a la cuenta</button><button class="btn small" data-acct-ticket="'+esc(g.key)+'">Ticket de la cuenta</button></div>'+
+  '</article>'}).join("")+
+  '<div class="debt-total"><span>'+list.length+(list.length===1?' persona':' personas')+'</span><span class="num">Total: '+money(sum)+'</span></div>'}
+
+/* ---------- Cuenta de una persona ---------- */
+function cuentaMsg(g){return "Hola "+g.nombre+", te saluda Shepo's Sneaker 👟\nEste es tu estado de cuenta:\n"+
+  g.items.map(({p,c})=>"• "+itemName(p)+": precio "+money(c.total)+", abonado "+money(c.pagado)+", debe "+money(c.saldo)).join("\n")+
+  "\nTotal que debes: "+money(g.saldo)+(g.prox?"\nPróximo pago: "+fdate(g.prox):"")+"\n¡Gracias!"}
+function renderAcct(){
+  const g=cuentaPend(state.acctKey);
+  if(!g){closeOv("#ov-acct");return}
+  const keep=id=>$(id)?$(id).value:null;
+  const kAmt=keep("#a-monto")||"",kM=keep("#a-metodo")||"efectivo",kF=keep("#a-fecha")||today(),kP=keep("#a-prox"),kN=keep("#a-nota")||"";
+  const wa=waLink(g.tel,cuentaMsg(g));
+  $("#acct").innerHTML='<div class="sh"><div><h2 id="acct-title">Cuenta de '+esc(g.nombre)+'</h2><span class="meta">'+(g.tel?esc(fphone(g.tel))+' · ':'')+g.items.length+(g.items.length>1?' artículos con saldo':' artículo con saldo')+'</span></div><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>'+
+    '<div class="acct-rows"><div class="acct-row acct-rh"><span>Artículo</span><span>Precio</span><span>Abonado</span><span>Debe</span></div>'+
+    g.items.map(({p,c})=>'<button class="acct-row" data-open="'+esc(p.id)+'"><span>'+esc(itemName(p))+(c.late?' <span class="pill late">Atrasado</span>':'')+'</span><span class="num">'+money(c.total)+'</span><span class="num">'+money(c.pagado)+'</span><span class="num" style="color:#FF8A8E;font-weight:700">'+money(c.saldo)+'</span></button>').join("")+
+    '<div class="acct-row acct-tot"><span>Total</span><span class="num">'+money(g.total)+'</span><span class="num">'+money(g.pagado)+'</span><span class="num">'+money(g.saldo)+'</span></div></div>'+
+    '<form class="payform" id="acctform" novalidate>'+
+      '<div class="full"><b>Abonar a la cuenta</b><br><span class="hint">El abono se aplica primero al artículo más antiguo y lo que sobre pasa al siguiente.</span></div>'+
+      '<div class="field"><label for="a-monto">Cantidad</label><input id="a-monto" type="number" min="0" step="1" inputmode="decimal" placeholder="'+g.saldo+'" value="'+esc(kAmt)+'"></div>'+
+      '<div class="field"><label for="a-metodo">Forma de pago</label><select id="a-metodo">'+Object.entries(METODOS).map(([k,v])=>'<option value="'+k+'"'+(k===kM?' selected':'')+'>'+v+'</option>').join("")+'</select></div>'+
+      '<div class="field"><label for="a-fecha">Fecha</label><input id="a-fecha" type="date" value="'+esc(kF)+'"></div>'+
+      '<div class="field"><label for="a-prox">Siguiente pago</label><input id="a-prox" type="date" value="'+esc(kP!=null?kP:(g.prox&&g.prox>=today()?g.prox:addDays(today(),15)))+'"></div>'+
+      '<div class="field full"><label for="a-nota">Nota (opcional)</label><input id="a-nota" value="'+esc(kN)+'"></div>'+
+      '<div class="full row-end"><button type="button" class="btn ghost small" data-aact="todo">Pagar todo ('+money(g.saldo)+')</button><button type="submit" class="btn primary">Guardar y ver ticket</button></div>'+
+    '</form>'+
+    '<div class="row-end" style="justify-content:flex-start"><button class="btn" data-aact="ticket">Ticket de la cuenta</button>'+(wa?'<a class="btn" href="'+esc(wa)+'" target="_blank" rel="noopener">Mandar estado por WhatsApp</a>':'')+'</div>'}
+function openAcct(key){state.acctKey=key;$("#acct").innerHTML="";renderAcct();openOv("#ov-acct")}
+$("#acct").addEventListener("click",e=>{const b=e.target.closest("[data-aact]");if(!b)return;const g=cuentaPend(state.acctKey);if(!g)return;
+  if(b.dataset.aact==="todo")$("#a-monto").value=g.saldo;
+  if(b.dataset.aact==="ticket")showCuentaTicket(g.key,null)});
+$("#acct").addEventListener("submit",e=>{if(e.target.id!=="acctform")return;e.preventDefault();
+  const g=cuentaPend(state.acctKey);if(!g)return;
+  const monto=num($("#a-monto").value);if(!(monto>0)){toast("Escribe una cantidad mayor a 0.");return}
+  if(monto>g.saldo+0.001){toast("Es más de lo que debe en total ("+money(g.saldo)+").");return}
+  const gid=uid(),fecha=$("#a-fecha").value||today(),metodo=$("#a-metodo").value,prox=$("#a-prox").value,nota=$("#a-nota").value.trim();
+  let rest=monto;
+  for(const {p,c} of g.items){
+    let patch=null;
+    if(rest>0&&c.saldo>0){const part=Math.min(rest,c.saldo);rest=Math.round((rest-part)*100)/100;
+      const mov={id:uid(),fecha,hora:nowHM(),tipo:"abono",monto:part,metodo,nota:nota||(g.items.length>1?"Abono a la cuenta ("+money(monto)+" en total)":""),grupo:gid};
+      const movimientos=[...(p.movimientos||[]),mov];const after=calc({...p,movimientos});
+      patch={movimientos,proximoPago:after.saldo>0?(prox||p.proximoPago||""):""}}
+    else if(prox&&c.saldo>0&&p.proximoPago!==prox)patch={proximoPago:prox};
+    if(patch)updateOrder(p,patch)}
+  $("#a-monto").value="";$("#a-nota").value="";
+  const left=cuentaPend(g.key);toast(left?"Abono de "+money(monto)+" registrado":"¡Cuenta liquidada!");
+  showCuentaTicket(g.key,gid)});
+
 function abRow(){return '<div class="abrow"><input type="date" aria-label="Fecha del abono"><input type="number" min="0" step="1" inputmode="decimal" placeholder="Cantidad" aria-label="Cantidad del abono"><button type="button" class="btn small ghost" data-abdel aria-label="Quitar abono">✕</button></div>'}
 function readAbonos(){return $$("#d-abonos .abrow").map(r=>{const [f,m]=r.querySelectorAll("input");return {fecha:f.value,monto:num(m.value)}}).filter(a=>a.monto>0)}
 function openDebt(){
@@ -276,6 +334,7 @@ function renderDetail(){
    '<div><small>Modelo</small>'+esc(p.modelo||"—")+'</div><div><small>Talla</small>'+esc(p.talla||"—")+'</div>'+
    '<div><small>Fecha</small>'+esc(fdate(p.fecha))+'</div><div><small>Próximo pago</small>'+(c.saldo>0&&p.proximoPago?'<span style="color:'+(c.late?'#FF8A8E':'inherit')+'">'+esc(fdate(p.proximoPago))+(c.late?' (atrasado)':'')+'</span>':'—')+'</div>'+
    (p.notas?'<div style="grid-column:1/-1"><small>Notas</small>'+esc(p.notas)+'</div>':'')+'</div>'+
+   (()=>{const g=cuentaPend(normName(p.cliente)||"sin-nombre");return g&&g.items.length>1?'<button class="btn light" data-act="ver-cuenta" style="width:100%">'+esc(p.cliente)+' tiene '+g.items.length+' artículos con saldo · Ver cuenta completa ('+money(g.saldo)+')</button>':''})()+
    '<div class="totals num"><div><small>Precio</small><strong>'+money(c.total)+'</strong></div><div><small>Pagado</small><strong>'+money(c.pagado)+'</strong></div><div class="saldo'+(c.saldo<=0?' done':'')+'"><small>'+(c.saldo<0?'A favor':'Saldo')+'</small><strong>'+money(Math.abs(c.saldo))+'</strong></div></div>'+
    '<div class="bar"><i class="'+(c.pct>=100?'full':'')+'" style="width:'+c.pct.toFixed(1)+'%"></i></div>'+
    '<form class="payform" id="payform" novalidate>'+
@@ -301,7 +360,7 @@ function renderDetail(){
 /* ================= Ventanas ================= */
 let lastFocus=null;
 function openOv(sel){lastFocus=document.activeElement;$(sel).classList.add("open")}
-function closeOv(sel){$(sel).classList.remove("open");if(sel==="#ov-detail")state.openId=null;if(lastFocus&&lastFocus.focus)try{lastFocus.focus()}catch(e){}}
+function closeOv(sel){$(sel).classList.remove("open");if(sel==="#ov-detail")state.openId=null;if(sel==="#ov-acct")state.acctKey=null;if(lastFocus&&lastFocus.focus)try{lastFocus.focus()}catch(e){}}
 function closeAllOv(){$$(".overlay.open").forEach(o=>o.classList.remove("open"));state.openId=null}
 $$(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o||e.target.closest("[data-close]"))closeOv("#"+o.id)}));
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){const o=$$(".overlay.open").pop();if(o)closeOv("#"+o.id)}});
@@ -428,6 +487,7 @@ $("#detail").addEventListener("click",async e=>{
   const act=a.dataset.act;
   if(act==="liquidar"){const c=calc(p);if(c.saldo>0){$("#p-monto").value=c.saldo;state.payType="abono";$$("#payform [data-pt]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.pt==="abono"))}}
   else if(act==="ticket-all")showTicket(p,null);
+  else if(act==="ver-cuenta"){const k=normName(p.cliente)||"sin-nombre";closeOv("#ov-detail");openAcct(k)}
   else if(act==="edit-order")openOrder(p);
   else if(act==="toggle-ent")updateOrder(p,{entregado:!p.entregado})&&toast(p.entregado?"Marcado como entregado":"Marcado como no entregado");
   else if(act==="copy-msg"){try{await navigator.clipboard.writeText($("#msg-text").textContent);toast("Mensaje copiado")}catch(err){toast("No se pudo copiar. Selecciona el texto y cópialo a mano.")}}
@@ -512,13 +572,54 @@ async function drawTicket(p,movId){
   const out=document.createElement("canvas");out.width=W;out.height=y;out.getContext("2d").drawImage(c,0,0);
   tkName="ticket-shepos-"+folio+".png";
   return await new Promise(r=>out.toBlob(r,"image/png"))}
-async function showTicket(p,movId){
-  try{tkBlob=await drawTicket(p,movId)}catch(e){toast("No se pudo generar el ticket.");return}
-  if(tkUrl)URL.revokeObjectURL(tkUrl);tkUrl=URL.createObjectURL(tkBlob);$("#tk-img").src=tkUrl;
-  const c=calc(p);const wa=waLink(p.telefono,"Hola "+(p.cliente||"")+", te comparto tu ticket de Shepo's Sneaker. "+(c.saldo>0?"Saldo pendiente: "+money(c.saldo)+".":"¡Gracias por tu compra!"));
-  const a=$("#tk-wa");if(wa){a.href=wa;a.hidden=false}else a.hidden=true;
+function presentTicket(blob,tel,waText){
+  tkBlob=blob;if(tkUrl)URL.revokeObjectURL(tkUrl);tkUrl=URL.createObjectURL(tkBlob);$("#tk-img").src=tkUrl;
+  const wa=waLink(tel,waText);const a=$("#tk-wa");if(wa){a.href=wa;a.hidden=false}else a.hidden=true;
   const f=tkFile();$("#tk-share").hidden=!(f&&navigator.canShare&&navigator.canShare({files:[f]}));
   openOv("#ov-ticket")}
+async function showTicket(p,movId){
+  let blob;try{blob=await drawTicket(p,movId)}catch(e){toast("No se pudo generar el ticket.");return}
+  const c=calc(p);presentTicket(blob,p.telefono,"Hola "+(p.cliente||"")+", te comparto tu ticket de Shepo's Sneaker. "+(c.saldo>0?"Saldo pendiente: "+money(c.saldo)+".":"¡Gracias por tu compra!"))}
+async function showCuentaTicket(key,gid){
+  const g=cuentas(false).find(x=>x.key===key);if(!g){toast("No se encontró la cuenta.");return}
+  let blob;try{blob=await drawCuentaTicket(g,gid)}catch(e){toast("No se pudo generar el ticket.");return}
+  const pend=g.items.reduce((a,x)=>a+Math.max(x.c.saldo,0),0);
+  presentTicket(blob,g.tel,"Hola "+g.nombre+", te comparto tu ticket de Shepo's Sneaker. "+(pend>0?"Saldo total pendiente: "+money(pend)+".":"¡Tu cuenta está liquidada, gracias por tu compra!"))}
+async function drawCuentaTicket(g,gid){
+  try{await document.fonts.ready}catch(e){}
+  const W=576,P=30,B='"Barlow",Arial,sans-serif',D='"Barlow Condensed","Arial Narrow",Arial,sans-serif';
+  const items=g.items.filter(({p,c})=>c.saldo>0||(gid&&(p.movimientos||[]).some(m=>m.grupo===gid)));
+  const pagos=[];for(const {p} of items)for(const m of (p.movimientos||[]))if(gid&&m.grupo===gid)pagos.push({p,m});
+  const recibido=pagos.reduce((a,x)=>a+num(x.m.monto),0);const m0=pagos[0]?pagos[0].m:null;
+  const c=document.createElement("canvas");c.width=W;c.height=3200;const x=c.getContext("2d");
+  x.fillStyle="#fff";x.fillRect(0,0,W,c.height);x.fillStyle="#000";x.textBaseline="alphabetic";
+  let y=24;const logo=await loadLogo();if(logo){x.drawImage(logo,(W-190)/2,y,190,190);y+=200}
+  const center=(t,font,dy)=>{x.font=font;x.textAlign="center";x.fillText(t,W/2,y+dy);x.textAlign="left";y+=dy};
+  const dash=()=>{y+=16;x.save();x.setLineDash([8,6]);x.lineWidth=2;x.beginPath();x.moveTo(P,y);x.lineTo(W-P,y);x.stroke();x.restore();y+=12};
+  const row=(l,r,font,dy)=>{x.font=font;x.textAlign="left";x.fillText(l,P,y+dy);x.textAlign="right";x.fillText(r,W-P,y+dy);x.textAlign="left";y+=dy};
+  center("SHEPO'S SNEAKER","800 46px "+D,44);center("Tenis 100% originales","600 24px "+B,32);center("Pedidos y WhatsApp: "+BIZ_PHONE,"500 22px "+B,30);
+  dash();center(gid?"TICKET DE PAGO":"ESTADO DE CUENTA","800 34px "+D,40);
+  row("Fecha: "+fdate(m0&&m0.fecha?m0.fecha:today())+" "+(m0&&m0.hora?m0.hora:nowHM()),gid?"Folio C-"+gid.slice(-5).toUpperCase():"","600 22px "+B,34);
+  dash();x.font="600 24px "+B;x.fillText("Cliente: "+g.nombre,P,y+32);y+=32;if(g.tel){x.font="500 22px "+B;x.fillText("Tel: "+fphone(g.tel),P,y+28);y+=28}
+  dash();x.font="700 22px "+B;x.fillText("ARTÍCULOS",P,y+28);x.textAlign="right";x.fillText("PRECIO",W-P,y+28);x.textAlign="left";y+=34;
+  let tot=0,pag=0,deb=0;
+  for(const {p,c:cc} of items){tot+=cc.total;pag+=cc.pagado;deb+=Math.max(cc.saldo,0);
+    x.font="600 24px "+B;const lines=wrap(x,itemName(p),W-2*P-150);lines.forEach((ln,i)=>{x.fillText(ln,P,y+30);if(i===0){x.textAlign="right";x.fillText(money(cc.total),W-P,y+30);x.textAlign="left"}y+=30});
+    x.font="500 21px "+B;x.fillStyle="#333";x.fillText("Abonado "+money(cc.pagado)+"  ·  "+(cc.saldo>0?"Debe "+money(cc.saldo):"LIQUIDADO"),P,y+27);x.fillStyle="#000";y+=36}
+  dash();
+  if(gid){x.fillRect(P,y+6,W-2*P,74);x.fillStyle="#fff";x.font="700 24px "+B;x.fillText("ABONO RECIBIDO",P+16,y+36);x.font="500 20px "+B;x.fillText(m0?(METODOS[m0.metodo]||""):"",P+16,y+64);
+    x.font="800 44px "+D;x.textAlign="right";x.fillText(money(recibido),W-P-16,y+60);x.textAlign="left";x.fillStyle="#000";y+=90;
+    if(pagos.length>1){x.font="500 21px "+B;x.fillText("Se aplicó a:",P,y+26);y+=28;for(const {p,m} of pagos){row("  "+itemName(p),money(m.monto),"500 21px "+B,28)}}
+    dash()}
+  row("Total de artículos",money(tot),"600 26px "+B,34);row("Total abonado",money(pag),"600 26px "+B,34);
+  row(deb>0?"SALDO TOTAL":"SALDO",money(deb),"800 36px "+D,48);
+  const prox=items.filter(i=>i.c.saldo>0&&i.p.proximoPago).map(i=>i.p.proximoPago).sort()[0];
+  if(deb>0&&prox){x.font="700 24px "+B;x.fillText("Próximo pago: "+fdate(prox),P,y+32);y+=32}
+  if(deb<=0&&tot>0){y+=10;x.save();x.lineWidth=4;x.strokeRect(W/2-130,y,260,60);x.font="800 40px "+D;x.textAlign="center";x.fillText("LIQUIDADO",W/2,y+45);x.restore();x.textAlign="left";y+=70}
+  dash();center("¡GRACIAS POR TU COMPRA!","800 32px "+D,40);center("Conserva este ticket como comprobante","500 20px "+B,28);
+  y+=30;const out=document.createElement("canvas");out.width=W;out.height=y;out.getContext("2d").drawImage(c,0,0);
+  tkName="ticket-cuenta-"+normName(g.nombre).replace(/[^a-z0-9]+/g,"-")+"-"+today()+".png";
+  return await new Promise(r=>out.toBlob(r,"image/png"))}
 function tkFile(){try{return new File([tkBlob],tkName,{type:"image/png"})}catch(e){return null}}
 function saveBlob(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
 $("#tk-share").onclick=async()=>{const f=tkFile();if(!f)return;try{await navigator.share({files:[f],title:"Ticket Shepo's Sneaker"})}catch(e){if(e&&e.name==="AbortError")return;toast("No se pudo compartir. Usa Guardar imagen.")}};
@@ -594,6 +695,8 @@ document.addEventListener("click",async e=>{
     if(k==="deuda")openDebt();
     if(k==="seed"){for(const [id,m] of Object.entries(SEED))save("modelos",id,{...m,costo:0,stock:{}});toast("Modelos agregados. Ponles precio y existencias con Editar.")}
     return}
+  const ac=e.target.closest("[data-acct]");if(ac){openAcct(ac.dataset.acct);return}
+  const at=e.target.closest("[data-acct-ticket]");if(at){showCuentaTicket(at.dataset.acctTicket,null);return}
   const s=e.target.closest("[data-sell]");if(s){openOrder(null,{kind:s.dataset.kind,modelId:s.dataset.sell});return}
   const em=e.target.closest("[data-edit-model]");if(em){openModel(state.modelos.find(m=>m.id===em.dataset.editModel));return}
   const dm=e.target.closest("[data-del-model]");if(dm){const m=state.modelos.find(x=>x.id===dm.dataset.delModel);if(m&&await confirmBox("¿Eliminar "+modelLabel(m)+" del inventario? Las ventas que ya lo tienen no se borran.")){if(remove("modelos",m.id))toast("Modelo eliminado")}}

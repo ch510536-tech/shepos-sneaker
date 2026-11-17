@@ -126,6 +126,21 @@ a.btn,a.btn:visited{color:var(--ink)}
 .debt .saldo{font-family:var(--display);font-size:1.25rem;color:#FF8A8E}
 .abrow{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center}
 .abrow input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px;width:100%;min-width:0}
+.acct{background:var(--panel);border-radius:12px;border-left:4px solid var(--line);padding:14px;display:grid;gap:10px}
+.acct.late{border-left-color:var(--red)}
+.acct-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.acct-name{display:block;font-size:1.1rem}
+.acct-debe{text-align:right;flex:none}
+.acct-debe small{display:block;font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.acct-debe span{font-family:var(--display);font-size:1.6rem;color:#FF8A8E}
+.acct-rows{display:grid;gap:4px}
+.acct-row{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:8px;align-items:center;background:#0B2F44;border:0;border-radius:8px;padding:8px 10px;width:100%;text-align:left;font-size:.88rem;cursor:pointer}
+button.acct-row:hover{filter:brightness(1.15)}
+.acct-row span:not(:first-child){text-align:right}
+.acct-rh{background:transparent;cursor:default;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-top:0;padding-bottom:0}
+.acct-tot{background:#071A27;font-weight:700;cursor:default}
+.acct-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:420px){.acct-row{grid-template-columns:1.4fr 1fr 1fr 1fr;font-size:.8rem;gap:5px;padding:8px}}
 .debt-total{display:flex;justify-content:space-between;padding:10px 14px;background:#071A27;border-radius:10px;font-weight:700}
 @media (max-width:720px){
   .debt-head{display:none}
@@ -419,6 +434,9 @@ td.amt.neg{color:#FF8A8E}
     <div class="row-end"><button type="button" class="btn ghost" data-close>Cancelar</button><button type="submit" class="btn primary">Guardar deuda</button></div>
   </form>
 </div>
+
+<!-- Ventana: cuenta de una persona -->
+<div class="overlay" id="ov-acct" role="dialog" aria-modal="true" aria-labelledby="acct-title"><div class="sheet" id="acct"></div></div>
 
 <!-- Ventana: detalle -->
 <div class="overlay" id="ov-detail" role="dialog" aria-modal="true" aria-labelledby="det-title"><div class="sheet" id="detail"></div></div>
