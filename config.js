@@ -1,14 +1,8 @@
-// =====================================================================
-//  CONFIGURACIÓN DE FIREBASE
-//  Pega aquí los datos de tu proyecto (ver LEEME.txt, paso 4).
-//  Firebase te los da en un bloque que empieza con "const firebaseConfig = {".
-//  Copia solo lo que está entre las llaves { } y reemplaza el ejemplo.
-// =====================================================================
 export const firebaseConfig = {
-  apiKey: "PEGA_AQUI_TU_API_KEY",
-  authDomain: "tu-proyecto.firebaseapp.com",
-  projectId: "tu-proyecto",
-  storageBucket: "tu-proyecto.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:0000000000000000"
+  apiKey: "AIzaSyBDK6v0uvGqbIhttv5rgMSum04Ts_RQhUY",
+  authDomain: "shepos-sneaker-3f527.firebaseapp.com",
+  projectId: "shepos-sneaker-3f527",
+  storageBucket: "shepos-sneaker-3f527.firebasestorage.app",
+  messagingSenderId: "974998981804",
+  appId: "1:974998981804:web:1d168db00823a30e9a2309"
 };
