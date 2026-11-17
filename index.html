@@ -113,6 +113,27 @@ a.btn,a.btn:visited{color:var(--ink)}
 .empty strong{color:var(--ink);font-size:1.1rem}
 .notice{background:rgba(242,169,59,.12);border:1px solid rgba(242,169,59,.4);color:#FFD9A0;border-radius:8px;padding:10px 12px;font-size:.92rem}
 
+/* Deudores */
+.debts{display:grid;gap:8px}
+.debt-head,.debt{display:grid;grid-template-columns:1.6fr 1.8fr .9fr .9fr 1.1fr .9fr;gap:10px;align-items:center}
+.debt-head{padding:0 14px;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.debt-head span:nth-child(n+3),.debt .r{text-align:right}
+.debt{background:var(--panel);border:0;border-left:4px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;width:100%;text-align:left;font-size:.92rem}
+.debt.late{border-left-color:var(--red)}
+.debt:hover{filter:brightness(1.12)}
+.debt .who b{display:block}
+.debt .k{display:none;font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.debt .saldo{font-family:var(--display);font-size:1.25rem;color:#FF8A8E}
+.abrow{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center}
+.abrow input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px;width:100%;min-width:0}
+.debt-total{display:flex;justify-content:space-between;padding:10px 14px;background:#071A27;border-radius:10px;font-weight:700}
+@media (max-width:720px){
+  .debt-head{display:none}
+  .debt{grid-template-columns:1fr 1fr;gap:6px 12px}
+  .debt .who,.debt .mod{grid-column:1/-1}
+  .debt .r{text-align:left}
+  .debt .k{display:block}
+}
 /* Reportes */
 .rep-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .card{background:var(--panel);border-radius:12px;padding:14px;display:grid;gap:10px;align-content:start}
@@ -180,7 +201,7 @@ td.amt.neg{color:#FF8A8E}
 .bottomnav{display:none}
 @media (max-width:720px){
   nav.tabs{display:none}
-  .bottomnav{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:#071A27;border-top:2px solid var(--red);padding-bottom:env(safe-area-inset-bottom)}
+  .bottomnav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:#071A27;border-top:2px solid var(--red);padding-bottom:env(safe-area-inset-bottom)}
   .bottomnav a{display:grid;justify-items:center;gap:2px;padding:9px 4px;text-decoration:none;color:var(--muted);font-size:.78rem;font-weight:600;position:relative}
   .bottomnav a svg{width:24px;height:24px}
   .bottomnav a[aria-current="page"]{color:#fff}
@@ -237,6 +258,7 @@ td.amt.neg{color:#FF8A8E}
     </div>
     <nav class="tabs" aria-label="Secciones">
       <a href="#ventas" data-tab="ventas">Ventas <span class="badge" data-late hidden></span></a>
+      <a href="#deudores" data-tab="deudores">Deudores <span class="badge" data-debt hidden></span></a>
       <a href="#catalogo" data-tab="catalogo">Inventario</a>
       <a href="#reportes" data-tab="reportes">Reportes</a>
     </nav>
@@ -268,6 +290,20 @@ td.amt.neg{color:#FF8A8E}
       <button class="chip" data-f="noent" aria-pressed="false">Por entregar</button>
     </div>
     <div id="orders" class="orders"></div>
+  </section>
+
+  <section class="view" id="view-deudores" hidden>
+    <div class="stats" id="debt-stats"></div>
+    <div class="toolbar">
+      <input class="search" id="q-debt" type="search" placeholder="Buscar persona, teléfono o modelo">
+      <div class="actions-row"><button class="btn primary" id="btn-deuda">+ Registrar deuda anterior</button></div>
+    </div>
+    <div class="chips" id="f-debt" role="group" aria-label="Filtrar deudores">
+      <button class="chip" data-f="todos" aria-pressed="true">Todos</button>
+      <button class="chip" data-f="late" aria-pressed="false">Atrasados</button>
+      <button class="chip" data-f="anterior" aria-pressed="false">Deudas anteriores</button>
+    </div>
+    <div class="debts" id="debts"></div>
   </section>
 
   <section class="view" id="view-catalogo" hidden>
@@ -305,6 +341,7 @@ td.amt.neg{color:#FF8A8E}
 
 <nav class="bottomnav" aria-label="Secciones">
   <a href="#ventas" data-tab="ventas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12l2 5H4z"/><path d="M4 7v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7"/><path d="M9 11a3 3 0 0 0 6 0"/></svg>Ventas<span class="badge" data-late hidden></span></a>
+  <a href="#deudores" data-tab="deudores"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2"/><path d="M17 13v8"/><path d="M14 16h6"/></svg>Deudores<span class="badge" data-debt hidden></span></a>
   <a href="#catalogo" data-tab="catalogo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 17l3-8 5 3 3-4 9 5v3H2z"/><path d="M2 20h20"/></svg>Inventario</a>
   <a href="#reportes" data-tab="reportes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>Reportes</a>
 </nav>
@@ -355,6 +392,31 @@ td.amt.neg{color:#FF8A8E}
       <div class="field full" id="o-entregado-f"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:.95rem;color:var(--ink)"><input type="checkbox" id="o-entregado" style="width:auto;min-height:0"> Ya se entregó el par</label></div>
     </div>
     <div class="row-end"><button type="button" class="btn ghost" data-close>Cancelar</button><button type="submit" class="btn primary" id="o-save">Guardar</button></div>
+  </form>
+</div>
+
+<!-- Ventana: deuda anterior -->
+<div class="overlay" id="ov-debt" role="dialog" aria-modal="true" aria-labelledby="debt-title">
+  <form class="sheet" id="form-debt" novalidate>
+    <div class="sh"><div><h2 id="debt-title">Deuda anterior</h2><p class="hint" style="margin:4px 0 0">Para personas que ya te debían antes de usar la app. Solo es obligatorio el nombre, el precio y sus abonos. No se descuenta del inventario.</p></div><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>
+    <div class="form">
+      <div class="field"><label for="d-cliente">Nombre de la persona</label><input id="d-cliente" list="clientes-d" autocomplete="off"><datalist id="clientes-d"></datalist></div>
+      <div class="field"><label for="d-tel">Teléfono</label><input id="d-tel" type="tel" inputmode="tel" placeholder="10 dígitos (opcional)"></div>
+      <div class="field"><label for="d-precio">Precio del tenis</label><input id="d-precio" type="number" min="0" step="1" inputmode="decimal" placeholder="1600"></div>
+      <div class="field"><label for="d-prox">Próximo pago</label><input id="d-prox" type="date"><span class="hint">Opcional.</span></div>
+      <div class="field full">
+        <span class="lbl">Abonos que ya te dio</span>
+        <span class="hint">Escribe cada abono. Si sabes la fecha, ponla y ese abono contará en el mes en que lo hizo. Si no la sabes, déjala vacía.</span>
+        <div id="d-abonos" style="display:grid;gap:6px"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><button type="button" class="btn small" id="d-add">+ Agregar otro abono</button><b class="num" id="d-saldo"></b></div>
+      </div>
+      <div class="field full"><label for="d-modelo">Modelo del tenis</label><input id="d-modelo" placeholder="Opcional, ej. Nike blancos"></div>
+      <div class="field"><label for="d-talla">Talla</label><input id="d-talla" placeholder="Opcional"></div>
+      <div class="field"><label for="d-fventa">Fecha de venta o entrega</label><input id="d-fventa" type="date"><span class="hint">Opcional. Si la pones, la venta cuenta en ese mes.</span></div>
+      <div class="field full"><label for="d-notas">Notas</label><textarea id="d-notas" placeholder="Ej. Abona cada quincena"></textarea></div>
+      <div class="field full"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:.95rem;color:var(--ink)"><input type="checkbox" id="d-entregado" style="width:auto;min-height:0"> Ya se le entregó el par</label></div>
+    </div>
+    <div class="row-end"><button type="button" class="btn ghost" data-close>Cancelar</button><button type="submit" class="btn primary">Guardar deuda</button></div>
   </form>
 </div>
 

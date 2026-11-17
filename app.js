@@ -23,7 +23,7 @@ const METODOS={efectivo:"Efectivo",tarjeta:"Tarjeta",transferencia:"Transferenci
 const BIZ_PHONE="282 104 8780";
 const sortSizes=a=>a.slice().sort((x,y)=>(parseFloat(x)-parseFloat(y))||String(x).localeCompare(String(y)));
 
-const state={user:null,modelos:[],pedidos:[],mode:"loading",view:"ventas",filter:"todos",catFilter:"todos",qp:"",qc:"",openId:null,payType:"abono",repMes:today().slice(0,7)};
+const state={user:null,modelos:[],pedidos:[],mode:"loading",view:"ventas",filter:"todos",catFilter:"todos",debtFilter:"todos",qd:"",qp:"",qc:"",openId:null,payType:"abono",repMes:today().slice(0,7)};
 
 /* ================= Firebase ================= */
 let fs=null,auth=null,unsubs=[];
@@ -103,22 +103,25 @@ function clientes(){const map=new Map();
 function banner(t){$("#banner").innerHTML=t?'<div class="notice">'+esc(t)+'</div>':""}
 function render(){
   const v=state.view;
-  ["ventas","catalogo","reportes"].forEach(k=>{$("#view-"+k).hidden=v!==k});
+  ["ventas","deudores","catalogo","reportes"].forEach(k=>{$("#view-"+k).hidden=v!==k});
   $$("[data-tab]").forEach(a=>{if(a.dataset.tab===v)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
   $("#sync").innerHTML=state.mode==="db"?(navigator.onLine?"<b>● En línea</b>":"<b>Sin conexión</b> · se sube al volver"):"<b>Cargando…</b>";
   const lateN=state.pedidos.filter(p=>calc(p).late).length;
   $$("[data-late]").forEach(b=>{b.hidden=!lateN;b.textContent=lateN});
-  const dis=state.mode==="loading";["#btn-contado","#btn-apartado","#btn-new-model"].forEach(s=>$(s).disabled=dis);
+  const debtN=new Set(state.pedidos.filter(p=>calc(p).saldo>0).map(p=>(p.cliente||"").trim().toLowerCase())).size;
+  $$("[data-debt]").forEach(b=>{b.hidden=!debtN;b.textContent=debtN});
+  const dis=state.mode==="loading";["#btn-contado","#btn-apartado","#btn-new-model","#btn-deuda"].forEach(s=>$(s).disabled=dis);
   $$(".xlsx-btn").forEach(b=>b.disabled=dis);
   if(v==="ventas"){renderStats();renderOrders()}
+  if(v==="deudores")renderDebts();
   if(v==="catalogo")renderCatalog();
   if(v==="reportes")renderReport();
   if(state.openId)renderDetail();
 }
 function renderStats(){
   const mes=today().slice(0,7),hoy=today();let vend=0,cobHoy=0,pen=0,late=0;
-  for(const p of state.pedidos){const c=calc(p);if((p.fecha||"").startsWith(mes))vend+=c.total;if(c.saldo>0)pen+=c.saldo;if(c.late)late++;
-    for(const m of c.movs)if(m.fecha===hoy)cobHoy+=m.tipo==="resta"?-num(m.monto):num(m.monto)}
+  for(const p of state.pedidos){const c=calc(p);if(p.fecha&&p.fecha.startsWith(mes))vend+=c.total;if(c.saldo>0)pen+=c.saldo;if(c.late)late++;
+    for(const m of c.movs)if(m.fecha===hoy&&!m.inicial)cobHoy+=m.tipo==="resta"?-num(m.monto):num(m.monto)}
   $("#st-mes").textContent=money(vend);$("#st-hoy").textContent=money(cobHoy);$("#st-pen").textContent=money(pen);$("#st-late").textContent=late}
 function renderOrders(){
   const el=$("#orders");
@@ -135,7 +138,7 @@ function renderOrders(){
     return [p.cliente,p.telefono,digits(p.telefono),p.modelo,p.talla,"pedido "+p.numero,"#"+p.numero,String(p.numero)].join(" ").toLowerCase().includes(q)});
   if(!list.length){el.innerHTML='<div class="empty">Ninguna venta coincide con la búsqueda o el filtro.</div>';return}
   el.innerHTML=list.map(p=>{const c=calc(p);return '<button class="order'+(c.late?' late':c.saldo<=0&&c.total>0?' done':'')+'" data-open="'+esc(p.id)+'">'+
-    '<div class="head"><span class="n">'+(p.tipo==="contado"?"Venta ":"Pedido ")+esc(p.numero)+'</span><span class="pills">'+(p.tipo==="contado"?'<span class="pill cash">Contado</span>':'')+(c.late?'<span class="pill late">Atrasado</span>':'')+(p.entregado?'<span class="pill del">Entregado</span>':'')+'<span class="pill '+c.est+'">'+c.lab+'</span></span></div>'+
+    '<div class="head"><span class="n">'+(p.tipo==="contado"?"Venta ":"Pedido ")+esc(p.numero)+'</span><span class="pills">'+(p.anterior?'<span class="pill del">Anterior</span>':'')+(p.tipo==="contado"?'<span class="pill cash">Contado</span>':'')+(c.late?'<span class="pill late">Atrasado</span>':'')+(p.entregado?'<span class="pill del">Entregado</span>':'')+'<span class="pill '+c.est+'">'+c.lab+'</span></span></div>'+
     '<div><div class="client">'+esc(p.cliente||"Cliente sin nombre")+'</div><div class="meta">'+esc(p.modelo||"Sin modelo")+(p.talla?' · Talla '+esc(p.talla):'')+'</div><div class="meta">'+esc(fdate(p.fecha))+(p.telefono?' · '+esc(fphone(p.telefono)):'')+(c.saldo>0&&p.proximoPago?' · Próx. pago <b style="color:'+(c.late?'#FF8A8E':'var(--ink)')+'">'+esc(fdate(p.proximoPago))+'</b>':'')+'</div></div>'+
     (p.tipo==="contado"&&c.saldo<=0?'':'<div class="bar"><i class="'+(c.pct>=100?'full':'')+'" style="width:'+c.pct.toFixed(1)+'%"></i></div>')+
     '<div class="money num"><span>Pagado <b>'+money(c.pagado)+'</b> de '+money(c.total)+'</span><span>Saldo <b style="color:'+(c.saldo>0?'#FF8A8E':'#6EE0A0')+'">'+money(Math.max(c.saldo,0))+'</b></span></div>'+
@@ -168,15 +171,71 @@ function renderCatalog(){
     '<div class="actions"><button class="btn small light" data-sell="'+esc(m.id)+'" data-kind="contado">Vender</button><button class="btn small primary" data-sell="'+esc(m.id)+'" data-kind="apartado">Apartar</button><button class="btn small" data-edit-model="'+esc(m.id)+'">Editar</button><button class="btn small danger" data-del-model="'+esc(m.id)+'" aria-label="Eliminar modelo">Eliminar</button></div>'+
   '</article>'}).join("")}
 
+/* ================= Deudores ================= */
+function lastPay(p){const ms=movsSorted(p).filter(m=>m.tipo!=="resta");const d=ms.filter(m=>m.fecha);return d.length?d[d.length-1]:ms.length?ms[ms.length-1]:null}
+function renderDebts(){
+  const all=state.pedidos.map(p=>({p,c:calc(p)})).filter(x=>x.c.saldo>0);
+  const personas=new Set(all.map(x=>(x.p.cliente||"").trim().toLowerCase())).size;
+  const total=all.reduce((a,x)=>a+x.c.saldo,0),lateN=all.filter(x=>x.c.late).length,ant=all.filter(x=>x.p.anterior).reduce((a,x)=>a+x.c.saldo,0);
+  $("#debt-stats").innerHTML='<div class="stat"><small>Personas que deben</small><strong class="num">'+personas+'</strong></div><div class="stat alert"><small>Total por cobrar</small><strong class="num">'+money(total)+'</strong></div><div class="stat warn"><small>Atrasados</small><strong class="num">'+lateN+'</strong></div><div class="stat"><small>De deudas anteriores</small><strong class="num">'+money(ant)+'</strong></div>';
+  const el=$("#debts");
+  if(state.mode==="loading"){el.innerHTML='<div class="empty">Cargando…</div>';return}
+  if(!all.length){el.innerHTML='<div class="empty"><strong>Nadie te debe</strong>Aquí aparecen los apartados con saldo pendiente. Si alguien ya te debía antes de usar la app, regístralo con "Registrar deuda anterior".<button class="btn primary" data-act="deuda">+ Registrar deuda anterior</button></div>';return}
+  const q=state.qd.trim().toLowerCase();
+  const list=all.filter(({p,c})=>{
+    if(state.debtFilter==="late"&&!c.late)return false;
+    if(state.debtFilter==="anterior"&&!p.anterior)return false;
+    return !q||[p.cliente,p.telefono,digits(p.telefono),p.modelo,p.talla].join(" ").toLowerCase().includes(q)})
+   .sort((a,b)=>(b.c.late-a.c.late)||(a.p.cliente||"").localeCompare(b.p.cliente||"")||(b.c.saldo-a.c.saldo));
+  if(!list.length){el.innerHTML='<div class="empty">Nadie coincide con la búsqueda o el filtro.</div>';return}
+  const sum=list.reduce((a,x)=>a+x.c.saldo,0);
+  el.innerHTML='<div class="debt-head"><span>Persona</span><span>Modelo</span><span>Precio</span><span>Abonado</span><span>Último abono</span><span>Debe</span></div>'+
+    list.map(({p,c})=>{const lp=lastPay(p);return '<button class="debt'+(c.late?' late':'')+'" data-open="'+esc(p.id)+'">'+
+      '<span class="who"><b>'+esc(p.cliente||"Sin nombre")+'</b><span class="meta">'+(p.telefono?esc(fphone(p.telefono)):'')+(c.late?' <span class="pill late">Atrasado</span>':p.proximoPago?' · Próx. '+esc(fdate(p.proximoPago)):'')+(p.anterior?' <span class="pill del">Anterior</span>':'')+'</span></span>'+
+      '<span class="mod"><span class="k">Modelo</span>'+esc(p.modelo||"Sin modelo")+(p.talla?' <span class="meta">· T. '+esc(p.talla)+'</span>':'')+'</span>'+
+      '<span class="r num"><span class="k">Precio</span>'+money(c.total)+'</span>'+
+      '<span class="r num"><span class="k">Abonado</span>'+money(c.pagado)+'</span>'+
+      '<span class="r num"><span class="k">Último abono</span>'+(lp?(lp.fecha?esc(fdate(lp.fecha)):'<span class="meta">Sin fecha</span>')+'<br><span class="meta">'+money(lp.monto)+'</span>':'<span class="meta">Sin abonos</span>')+'</span>'+
+      '<span class="r"><span class="k">Debe</span><span class="saldo num">'+money(c.saldo)+'</span></span>'+
+    '</button>'}).join("")+
+    '<div class="debt-total"><span>'+list.length+(list.length===1?' deuda':' deudas')+'</span><span class="num">Total: '+money(sum)+'</span></div>'}
+function abRow(){return '<div class="abrow"><input type="date" aria-label="Fecha del abono"><input type="number" min="0" step="1" inputmode="decimal" placeholder="Cantidad" aria-label="Cantidad del abono"><button type="button" class="btn small ghost" data-abdel aria-label="Quitar abono">✕</button></div>'}
+function readAbonos(){return $$("#d-abonos .abrow").map(r=>{const [f,m]=r.querySelectorAll("input");return {fecha:f.value,monto:num(m.value)}}).filter(a=>a.monto>0)}
+function openDebt(){
+  $("#clientes-d").innerHTML=clientes().map(c=>'<option value="'+esc(c.nombre)+'">'+esc(fphone(c.tel))+'</option>').join("");
+  ["#d-cliente","#d-tel","#d-modelo","#d-talla","#d-precio","#d-fventa","#d-prox","#d-notas"].forEach(s=>$(s).value="");
+  $("#d-abonos").innerHTML=abRow();$("#d-entregado").checked=false;updDebtSaldo();
+  openOv("#ov-debt");setTimeout(()=>{try{$("#d-cliente").focus()}catch(e){}},50)}
+function updDebtSaldo(){const p=num($("#d-precio").value),a=readAbonos().reduce((s,x)=>s+x.monto,0);
+  $("#d-saldo").textContent=(a>0?"Lleva "+money(a):"")+(p>0?(a>0?" · ":"")+"Le falta "+money(Math.max(p-a,0)):"")}
+$("#d-precio").addEventListener("input",updDebtSaldo);
+$("#d-abonos").addEventListener("input",updDebtSaldo);
+$("#d-abonos").addEventListener("click",e=>{const b=e.target.closest("[data-abdel]");if(!b)return;b.parentElement.remove();if(!$("#d-abonos .abrow"))$("#d-abonos").innerHTML=abRow();updDebtSaldo()});
+$("#d-add").onclick=()=>{$("#d-abonos").insertAdjacentHTML("beforeend",abRow());const r=$$("#d-abonos .abrow").pop();r.querySelector("input[type=number]").focus()};
+$("#d-cliente").addEventListener("change",()=>{const n=$("#d-cliente").value.trim().toLowerCase();const c=clientes().find(x=>x.nombre.toLowerCase()===n);if(c&&c.tel&&!$("#d-tel").value)$("#d-tel").value=c.tel});
+$("#form-debt").addEventListener("submit",e=>{e.preventDefault();
+  const cliente=$("#d-cliente").value.trim(),modelo=$("#d-modelo").value.trim(),precio=num($("#d-precio").value);
+  const abs=readAbonos();const abonado=abs.reduce((s,x)=>s+x.monto,0);
+  if(!cliente){toast("Escribe el nombre de la persona.");return}
+  if(!(precio>0)){toast("Escribe el precio del tenis.");return}
+  if(abonado>precio){toast("Los abonos suman más que el precio. Revisa las cantidades.");return}
+  /* Abono con fecha = pago normal (cuenta en su mes). Sin fecha = abono anterior (solo suma a lo abonado). */
+  const movs=abs.map(a=>a.fecha?{id:uid(),fecha:a.fecha,hora:"",tipo:"abono",monto:a.monto,metodo:"",nota:"Abono anterior"}:{id:uid(),fecha:"",hora:"",tipo:"abono",monto:a.monto,metodo:"",nota:"Abono anterior (sin fecha)",inicial:true});
+  const data={numero:nextNumber(),tipo:"apartado",anterior:true,cliente,telefono:$("#d-tel").value.trim(),fecha:$("#d-fventa").value||"",
+    modeloId:"",modelo,talla:$("#d-talla").value.trim(),precio,costo:0,notas:$("#d-notas").value.trim(),entregado:$("#d-entregado").checked,
+    proximoPago:precio-abonado>0?$("#d-prox").value:"",movimientos:movs,stockRef:null,creado:Date.now()};
+  const id=uid();if(!save("pedidos",id,data))return;
+  if(!state.pedidos.some(x=>x.id===id))state.pedidos.push({id,...data});closeOv("#ov-debt");toast("Deuda de "+cliente+" registrada");render()});
+
 /* ================= Reportes ================= */
 function renderReport(){
   const mes=state.repMes||today().slice(0,7);$("#rep-mes").value=mes;
   let vendido=0,pares=0,cobrado=0,gan=0,conCosto=0,ventasMes=0,pen=0,late=0;
   const met={efectivo:0,tarjeta:0,transferencia:0,otro:0};const top=new Map();
   for(const p of state.pedidos){const c=calc(p);if(c.saldo>0)pen+=c.saldo;if(c.late)late++;
-    if((p.fecha||"").startsWith(mes)){ventasMes++;vendido+=c.total;pares++;const k=p.modelo||"Sin modelo";top.set(k,(top.get(k)||0)+1);
+    if(p.fecha&&p.fecha.startsWith(mes)){ventasMes++;vendido+=c.total;pares++;const k=p.modelo||"Sin modelo";top.set(k,(top.get(k)||0)+1);
       if(num(p.costo)>0){gan+=c.total-num(p.costo);conCosto++}}
-    for(const m of c.movs)if((m.fecha||"").startsWith(mes)){const v=(m.tipo==="resta"?-1:1)*num(m.monto);cobrado+=v;met[METODOS[m.metodo]?m.metodo:"otro"]+=v}}
+    for(const m of c.movs)if(!m.inicial&&(m.fecha||"").startsWith(mes)){const v=(m.tipo==="resta"?-1:1)*num(m.monto);cobrado+=v;met[METODOS[m.metodo]?m.metodo:"otro"]+=v}}
   $("#rep-stats").innerHTML=
     '<div class="stat"><small>Vendido en el mes</small><strong class="num">'+money(vendido)+'</strong></div>'+
     '<div class="stat good"><small>Cobrado en el mes</small><strong class="num">'+money(cobrado)+'</strong></div>'+
@@ -230,7 +289,7 @@ function renderDetail(){
    '</form>'+
    '<div><h3 style="font-size:1.15rem;text-transform:uppercase;margin-bottom:4px">Historial de pagos</h3>'+
    (movs.length?'<div class="tbl"><table><thead><tr><th>Fecha</th><th>Concepto</th><th style="text-align:right">Cantidad</th><th></th></tr></thead><tbody>'+
-     movs.map(m=>'<tr><td class="num">'+esc(fdate(m.fecha))+(m.hora?'<br><span class="muted" style="font-size:.78rem">'+esc(m.hora)+'</span>':'')+'</td><td>'+(m.tipo==="resta"?'Resta':'Pago')+(m.metodo?' · '+esc(METODOS[m.metodo]||m.metodo):'')+(m.nota?'<br><span class="muted" style="font-size:.82rem">'+esc(m.nota)+'</span>':'')+'</td><td class="amt'+(m.tipo==="resta"?' neg':'')+'">'+(m.tipo==="resta"?'−':'+')+money(m.monto)+'</td><td style="text-align:right;white-space:nowrap">'+(m.tipo!=="resta"?'<button class="btn small" data-ticket="'+esc(m.id)+'">Ticket</button> ':'')+'<button class="btn small ghost" data-del-mov="'+esc(m.id)+'" aria-label="Borrar pago">✕</button></td></tr>').join("")+
+     movs.map(m=>'<tr><td class="num">'+(m.fecha?esc(fdate(m.fecha)):'<span class="muted">Sin fecha</span>')+(m.hora?'<br><span class="muted" style="font-size:.78rem">'+esc(m.hora)+'</span>':'')+'</td><td>'+(m.inicial?'Abono anterior':m.tipo==="resta"?'Resta':'Pago')+(m.metodo?' · '+esc(METODOS[m.metodo]||m.metodo):'')+(m.nota?'<br><span class="muted" style="font-size:.82rem">'+esc(m.nota)+'</span>':'')+'</td><td class="amt'+(m.tipo==="resta"?' neg':'')+'">'+(m.tipo==="resta"?'−':'+')+money(m.monto)+'</td><td style="text-align:right;white-space:nowrap">'+(m.tipo!=="resta"?'<button class="btn small" data-ticket="'+esc(m.id)+'">Ticket</button> ':'')+'<button class="btn small ghost" data-del-mov="'+esc(m.id)+'" aria-label="Borrar pago">✕</button></td></tr>').join("")+
      '</tbody></table></div>':'<p class="muted" style="margin:0">Todavía no hay pagos.</p>')+'</div>'+
    '<div class="row-end" style="justify-content:flex-start"><button class="btn" data-act="ticket-all">Ticket con estado de cuenta</button></div>'+
    '<div class="msgbox"><strong>'+(c.late?'Recordatorio de pago':'Mensaje para el cliente')+'</strong><p id="msg-text">'+esc(msg)+'</p><div class="row-end" style="justify-content:flex-start">'+
@@ -417,7 +476,7 @@ async function drawTicket(p,movId){
   const text=(t,font,dy)=>{x.font=font||"500 24px "+B;for(const ln of wrap(x,t,W-2*P)){x.fillText(ln,P,y+(dy||30));y+=(dy||30)}};
   dash();
   center(mov?(p.tipo==="contado"&&saldo<=0&&pagos.length===1?"TICKET DE VENTA":"TICKET DE PAGO"):"ESTADO DE CUENTA","800 34px "+D,40);
-  row("Folio: "+folio,fdate(mov?mov.fecha:today())+" "+(mov&&mov.hora?mov.hora:nowHM()),"600 24px "+B,36);
+  row("Folio: "+folio,fdate(mov&&mov.fecha?mov.fecha:today())+" "+(mov&&mov.hora?mov.hora:nowHM()),"600 24px "+B,36);
   row((p.tipo==="contado"?"Venta":"Pedido")+" #"+p.numero,p.tipo==="contado"?"Contado":"Apartado","500 22px "+B,30);
   dash();
   text("Cliente: "+(p.cliente||"Mostrador"),"600 24px "+B,32);
@@ -430,14 +489,14 @@ async function drawTicket(p,movId){
   dash();
   if(mov){
     x.fillStyle="#000";x.fillRect(P,y+6,W-2*P,74);x.fillStyle="#fff";
-    x.font="700 24px "+B;x.fillText(mov.tipo==="resta"?"DEVOLUCIÓN":(saldo<=0&&pagos.length===1?"PAGO TOTAL":"ABONO RECIBIDO"),P+16,y+36);
+    x.font="700 24px "+B;x.fillText(mov.inicial?"ABONADO ANTERIORMENTE":mov.tipo==="resta"?"DEVOLUCIÓN":(saldo<=0&&pagos.length===1?"PAGO TOTAL":"ABONO RECIBIDO"),P+16,y+36);
     x.font="500 20px "+B;x.fillText(METODOS[mov.metodo]||"",P+16,y+64);
     x.font="800 44px "+D;x.textAlign="right";x.fillText(money(mov.monto),W-P-16,y+60);x.textAlign="left";x.fillStyle="#000";y+=90;
     if(mov.nota)text("Nota: "+mov.nota,"italic 500 21px "+B,28);
   } else {
     x.font="700 22px "+B;x.fillText("PAGOS",P,y+28);y+=32;
     if(!all.length)text("Sin pagos registrados","500 22px "+B,28);
-    for(const m of all){const neg=m.tipo==="resta";row(fdate(m.fecha)+"  "+(neg?"Resta":(METODOS[m.metodo]||"Pago")),(neg?"-":"")+money(m.monto),"500 22px "+B,30)}
+    for(const m of all){const neg=m.tipo==="resta";row((m.fecha?fdate(m.fecha):"Sin fecha")+"  "+(neg?"Resta":(METODOS[m.metodo]||"Pago")),(neg?"-":"")+money(m.monto),"500 22px "+B,30)}
   }
   dash();
   row("Total",money(total),"600 26px "+B,34);
@@ -490,6 +549,10 @@ function exportExcel(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,wsR,"Resumen");
   XLSX.utils.book_append_sheet(wb,sheet(V,[6,10,12,22,14,30,7,11,11,11,11,11,11,13,10,28],[7,8,9,10,11]),"Ventas");
+  const DD=[["Persona","Teléfono","Modelo","Talla","Precio","Abonado","Último abono","Monto último abono","Debe","Próximo pago","Estado","Deuda anterior"]];
+  for(const p of peds.slice().sort((a,b)=>(a.cliente||"").localeCompare(b.cliente||""))){const c=calc(p);if(!(c.saldo>0))continue;const lp=lastPay(p);
+    DD.push([p.cliente||"",fphone(p.telefono),p.modelo||"",p.talla||"",c.total,c.pagado,lp?xlDate(lp.fecha):"",lp&&!lp.inicial?num(lp.monto):"",c.saldo,xlDate(p.proximoPago),c.late?"Atrasado":"Al corriente",p.anterior?"Sí":"No"])}
+  XLSX.utils.book_append_sheet(wb,sheet(DD,[22,14,30,7,11,11,13,12,11,13,12,10],[4,5,7,8]),"Deudores");
   XLSX.utils.book_append_sheet(wb,sheet(A,[6,22,12,8,10,14,12,26],[6]),"Pagos");
   XLSX.utils.book_append_sheet(wb,sheet(I,[12,20,20,11,11,14,8,44],[3,4,5]),"Inventario");
   const buf=XLSX.write(wb,{bookType:"xlsx",type:"array",compression:true});
@@ -507,10 +570,13 @@ $("#bk-file").addEventListener("change",async e=>{const file=e.target.files[0];e
   toast("Respaldo importado")});
 
 /* ================= Navegación y eventos ================= */
-function route(){const h=location.hash.replace("#","");state.view=["catalogo","reportes"].includes(h)?h:"ventas";render();window.scrollTo(0,0)}
+function route(){const h=location.hash.replace("#","");state.view=["deudores","catalogo","reportes"].includes(h)?h:"ventas";render();window.scrollTo(0,0)}
 window.addEventListener("hashchange",route);
 $("#q-ped").addEventListener("input",e=>{state.qp=e.target.value;renderOrders()});
 $("#q-cat").addEventListener("input",e=>{state.qc=e.target.value;renderCatalog()});
+$("#q-debt").addEventListener("input",e=>{state.qd=e.target.value;renderDebts()});
+$("#f-debt").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;state.debtFilter=b.dataset.f;$$("#f-debt .chip").forEach(c=>c.setAttribute("aria-pressed",c===b));renderDebts()});
+$("#btn-deuda").onclick=()=>openDebt();
 $("#rep-mes").addEventListener("change",e=>{state.repMes=e.target.value||today().slice(0,7);renderReport()});
 $("#f-ped").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;state.filter=b.dataset.f;$$("#f-ped .chip").forEach(c=>c.setAttribute("aria-pressed",c===b));renderOrders()});
 $("#f-cat").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;state.catFilter=b.dataset.f;$$("#f-cat .chip").forEach(c=>c.setAttribute("aria-pressed",c===b));renderCatalog()});
@@ -525,6 +591,7 @@ document.addEventListener("click",async e=>{
     if(k==="contado")openOrder(null,{kind:"contado"});
     if(k==="apartado")openOrder(null,{kind:"apartado"});
     if(k==="new-model")openModel(null);
+    if(k==="deuda")openDebt();
     if(k==="seed"){for(const [id,m] of Object.entries(SEED))save("modelos",id,{...m,costo:0,stock:{}});toast("Modelos agregados. Ponles precio y existencias con Editar.")}
     return}
   const s=e.target.closest("[data-sell]");if(s){openOrder(null,{kind:s.dataset.kind,modelId:s.dataset.sell});return}
