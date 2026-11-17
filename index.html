@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shepo's Sneaker</title>
+<meta name="theme-color" content="#0A2233">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shepo's">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Marca: azul petróleo del logo, rojo de acento; app de una columna con pestañas inferiores en celular */
+  --bg:#0A2233;--panel:#0F3A52;--panel-2:#13455F;--line:#245A75;--ink:#F3F6F8;--muted:#9DB4C2;
+  --red:#D41F26;--ok:#2FB36B;--warn:#F2A93B;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow","Segoe UI",Roboto,Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+img{max-width:100%;display:block}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:.02em}
+.num{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+
+header.top{background:linear-gradient(180deg,#071A27 0%,var(--bg) 100%);border-bottom:3px solid var(--red);padding-top:env(safe-area-inset-top)}
+.brand{display:flex;align-items:center;gap:12px;padding:12px 0}
+.brand img{width:60px;height:60px;border-radius:50%}
+.brand h1{font-size:1.8rem;line-height:1;text-transform:uppercase}
+.brand h1 span{color:var(--red)}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
+.hright{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:.78rem;color:var(--muted);text-align:right}
+.hright b{color:var(--ink);font-weight:600}
+nav.tabs{display:flex;gap:4px}
+nav.tabs a{padding:10px 16px;text-decoration:none;color:var(--muted);font-family:var(--display);font-size:1.1rem;text-transform:uppercase;letter-spacing:.04em;border-radius:8px 8px 0 0;display:flex;gap:6px;align-items:center}
+nav.tabs a[aria-current="page"]{background:var(--red);color:#fff}
+nav.tabs .badge{background:#fff;color:var(--red);border-radius:99px;font-size:.75rem;padding:0 7px;font-family:var(--body);font-weight:700}
+
+main.wrap{padding:18px 16px calc(110px + env(safe-area-inset-bottom));display:grid;gap:16px}
+.view{display:grid;gap:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{background:var(--panel);border-radius:10px;padding:11px 14px;border-left:4px solid var(--line)}
+.stat small{display:block;color:var(--muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+.stat strong{font-family:var(--display);font-size:1.6rem}
+.stat.alert{border-left-color:var(--red)}.stat.good{border-left-color:var(--ok)}.stat.warn{border-left-color:var(--warn)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.search{flex:1 1 220px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.search::placeholder{color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 12px;cursor:pointer;color:var(--muted);font-size:.88rem}
+.chip[aria-pressed="true"]{background:#fff;color:var(--bg);border-color:#fff;font-weight:600}
+.actions-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border-radius:8px;padding:10px 16px;cursor:pointer;font-weight:600;background:var(--panel-2);border:1px solid var(--line);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+a.btn,a.btn:visited{color:var(--ink)}
+.btn:hover{filter:brightness(1.12)}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+.btn.light{background:#fff;border-color:#fff;color:var(--bg)}
+.btn.ghost{background:transparent}
+.btn.danger{background:transparent;border-color:var(--red);color:#FF8A8E}
+.btn.small{padding:6px 10px;font-size:.86rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.orders{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.order{background:var(--panel);border-radius:12px;padding:14px;display:grid;gap:9px;cursor:pointer;border:1px solid transparent;text-align:left;width:100%;border-left:4px solid var(--line)}
+.order.late{border-left-color:var(--red)}.order.done{border-left-color:var(--ok)}
+.order:hover{border-color:var(--line)}
+.order .head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.order .n{font-family:var(--display);font-size:1.3rem;text-transform:uppercase}
+.order .client{font-weight:600}
+.meta{color:var(--muted);font-size:.88rem}
+.pills{display:flex;gap:4px;flex-wrap:wrap}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.pill.ok{background:rgba(47,179,107,.18);color:#6EE0A0}
+.pill.warn{background:rgba(242,169,59,.18);color:#FFC874}
+.pill.none{background:rgba(212,31,38,.2);color:#FF8A8E}
+.pill.late{background:var(--red);color:#fff}
+.pill.del{background:rgba(255,255,255,.12);color:#fff}
+.pill.cash{background:rgba(255,255,255,.9);color:var(--bg)}
+.bar{height:8px;background:#071A27;border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--red);border-radius:99px}
+.bar i.full{background:var(--ok)}
+.money{display:flex;justify-content:space-between;font-size:.9rem;gap:8px;flex-wrap:wrap}
+.money b{font-size:1.02rem}
+
+.catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.model{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.model .pic{background:#fff;aspect-ratio:4/3;display:grid;place-items:center;position:relative}
+.model .pic img{max-height:100%;object-fit:contain}
+.model .pic .ph{color:#9AA7B0;font-size:.9rem}
+.model .pic .pill{position:absolute;top:8px;left:8px}
+.model .body{padding:12px;display:grid;gap:5px;flex:1;align-content:start}
+.model .brand-n{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em}
+.model h3{font-size:1.3rem;text-transform:uppercase}
+.model .price{font-family:var(--display);font-size:1.5rem;color:#fff}
+.model .price.missing{color:var(--warn);font-size:1rem;font-family:var(--body);font-weight:600}
+.sizes{display:flex;flex-wrap:wrap;gap:4px}
+.size{background:#071A27;border-radius:6px;padding:2px 7px;font-size:.8rem}
+.size b{color:#FFC874}
+.model .actions{display:flex;gap:6px;padding:0 12px 12px;flex-wrap:wrap}
+
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--muted);display:grid;gap:10px;justify-items:center;grid-column:1/-1}
+.empty strong{color:var(--ink);font-size:1.1rem}
+.notice{background:rgba(242,169,59,.12);border:1px solid rgba(242,169,59,.4);color:#FFD9A0;border-radius:8px;padding:10px 12px;font-size:.92rem}
+
+/* Reportes */
+.rep-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:var(--panel);border-radius:12px;padding:14px;display:grid;gap:10px;align-content:start}
+.card h3{font-size:1.2rem;text-transform:uppercase}
+.hbar{display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:center;font-size:.9rem}
+.hbar .track{height:12px;background:#071A27;border-radius:99px;overflow:hidden}
+.hbar .track i{display:block;height:100%;background:var(--red);border-radius:99px}
+.hbar span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list{display:grid;gap:6px}
+.lrow{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#0B2F44;border-radius:8px;padding:8px 10px;font-size:.92rem;cursor:pointer;border:0;width:100%;text-align:left}
+.lrow:hover{filter:brightness(1.15)}
+.muted{color:var(--muted)}
+
+/* Ventanas */
+.overlay{position:fixed;inset:0;background:rgba(3,12,18,.72);display:none;align-items:flex-start;justify-content:center;padding:24px 12px calc(24px + env(safe-area-inset-bottom));overflow-y:auto;z-index:20}
+.overlay.open{display:flex}
+.sheet{background:var(--bg);border:1px solid var(--line);border-top:4px solid var(--red);border-radius:12px;width:100%;max-width:620px;padding:18px;display:grid;gap:14px}
+.sheet .sh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.sheet h2{font-size:1.6rem;text-transform:uppercase}
+.x{background:transparent;border:0;font-size:1.8rem;cursor:pointer;color:var(--muted);line-height:1;padding:0 4px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form .full{grid-column:1/-1}
+.field{display:grid;gap:4px;align-content:start}
+.field label,.lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.field input,.field select,.field textarea{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-height:42px}
+.field textarea{min-height:60px;resize:vertical}
+.hint{font-size:.8rem;color:var(--muted)}
+.stockgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px}
+.stockgrid label{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 6px;font-size:.88rem;text-transform:none;letter-spacing:0;color:var(--ink)}
+.stockgrid label.has{border-color:var(--red);background:#2A1B24}
+.stockgrid input{width:42px;min-height:30px;padding:3px 4px;background:#071A27;border:1px solid var(--line);border-radius:6px;text-align:center}
+.row-end{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.photo-in{display:flex;gap:10px;align-items:center}
+.photo-in .thumb{width:90px;height:68px;background:#fff;border-radius:6px;display:grid;place-items:center;overflow:hidden;flex:none}
+.photo-in .thumb img{max-height:100%;object-fit:contain}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;background:transparent;border:0;padding:9px 6px;cursor:pointer;color:var(--muted);font-size:.88rem}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--bg);font-weight:700}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;background:var(--panel);border-radius:10px;padding:12px}
+.detail-grid small{display:block;color:var(--muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.05em}
+.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.totals div{background:var(--panel);border-radius:10px;padding:10px}
+.totals small{display:block;color:var(--muted);font-size:.74rem;text-transform:uppercase}
+.totals strong{font-family:var(--display);font-size:1.45rem}
+.totals .saldo strong{color:#FF8A8E}.totals .saldo.done strong{color:#6EE0A0}
+.payform{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--panel);border-radius:10px;padding:12px}
+.payform .full{grid-column:1/-1}
+.nextpay{display:flex;gap:8px;align-items:end;flex-wrap:wrap;background:var(--panel);border-radius:10px;padding:12px}
+.nextpay .field{flex:1 1 160px}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{color:var(--muted);font-weight:600;font-size:.74rem;text-transform:uppercase;letter-spacing:.05em}
+td.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+td.amt.neg{color:#FF8A8E}
+.msgbox{background:var(--panel);border-radius:10px;padding:12px;display:grid;gap:8px;font-size:.9rem}
+.msgbox p{margin:0;white-space:pre-wrap}
+.ticket-prev{background:#E9EDF0;border-radius:8px;padding:10px;display:flex;justify-content:center}
+.ticket-prev img{width:100%;max-width:340px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#fff;color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:40;display:none;max-width:90vw;text-align:center}
+.toast.show{display:block}
+.backup{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.88rem;color:var(--muted)}
+
+/* Barra inferior en celular */
+.bottomnav{display:none}
+@media (max-width:720px){
+  nav.tabs{display:none}
+  .bottomnav{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:#071A27;border-top:2px solid var(--red);padding-bottom:env(safe-area-inset-bottom)}
+  .bottomnav a{display:grid;justify-items:center;gap:2px;padding:9px 4px;text-decoration:none;color:var(--muted);font-size:.78rem;font-weight:600;position:relative}
+  .bottomnav a svg{width:24px;height:24px}
+  .bottomnav a[aria-current="page"]{color:#fff}
+  .bottomnav a[aria-current="page"] svg{color:var(--red)}
+  .bottomnav .badge{position:absolute;top:4px;left:calc(50% + 8px);background:var(--red);color:#fff;border-radius:99px;font-size:.68rem;padding:0 6px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .rep-grid{grid-template-columns:1fr}
+  .brand h1{font-size:1.45rem}
+  .brand img{width:50px;height:50px}
+  .brand p{display:none}
+  .toolbar .actions-row{width:100%}
+  .toolbar .actions-row .btn{flex:1}
+}
+@media (max-width:420px){
+  .form{grid-template-columns:1fr}
+  .detail-grid{grid-template-columns:1fr}
+  .totals strong{font-size:1.15rem}
+  .hbar{grid-template-columns:90px 1fr auto}
+}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(8px)}to{transform:none}}}
+
+/* Inicio de sesión */
+.login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px;z-index:30;overflow-y:auto}
+.login.open{display:flex}
+.login-card{width:100%;max-width:380px;display:grid;gap:12px;justify-items:center;background:var(--panel);border-top:4px solid var(--red);border-radius:14px;padding:26px 22px}
+.login-card img{border-radius:50%}
+.login-card h1{font-size:2rem;text-transform:uppercase}
+.login-card h1 span{color:var(--red)}
+.login-card p{margin:0;color:var(--muted);text-align:center}
+.login-card .field{width:100%}
+.login-card .btn.primary{width:100%;padding:12px}
+
+/* Impresión del ticket */
+#print-area{display:none}
+@media print{
+  @page{size:80mm auto;margin:0}
+  body{background:#fff}
+  body>*:not(#print-area){display:none!important}
+  #print-area{display:block!important;width:80mm}
+  #print-area img{width:80mm;max-width:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <img src="logo.webp" alt="Logo de Shepo's Sneaker">
+      <div>
+        <h1>Shepo's <span>Sneaker</span></h1>
+        <p>Ventas, apartados e inventario</p>
+      </div>
+      <div class="hright"><span id="sync"><b>Cargando…</b></span><span id="userbox"></span></div>
+    </div>
+    <nav class="tabs" aria-label="Secciones">
+      <a href="#ventas" data-tab="ventas">Ventas <span class="badge" data-late hidden></span></a>
+      <a href="#catalogo" data-tab="catalogo">Inventario</a>
+      <a href="#reportes" data-tab="reportes">Reportes</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="banner"></div>
+
+  <section class="view" id="view-ventas">
+    <div class="stats">
+      <div class="stat"><small>Vendido este mes</small><strong class="num" id="st-mes">$0</strong></div>
+      <div class="stat good"><small>Cobrado hoy</small><strong class="num" id="st-hoy">$0</strong></div>
+      <div class="stat alert"><small>Por cobrar</small><strong class="num" id="st-pen">$0</strong></div>
+      <div class="stat warn"><small>Pagos atrasados</small><strong class="num" id="st-late">0</strong></div>
+    </div>
+    <div class="toolbar">
+      <div class="actions-row">
+        <button class="btn light" id="btn-contado">+ Venta de contado</button>
+        <button class="btn primary" id="btn-apartado">+ Apartado</button>
+      </div>
+      <input class="search" id="q-ped" type="search" placeholder="Buscar cliente, teléfono, modelo o número">
+    </div>
+    <div class="chips" id="f-ped" role="group" aria-label="Filtrar ventas">
+      <button class="chip" data-f="todos" aria-pressed="true">Todas</button>
+      <button class="chip" data-f="pend" aria-pressed="false">Con saldo</button>
+      <button class="chip" data-f="late" aria-pressed="false">Atrasados</button>
+      <button class="chip" data-f="liq" aria-pressed="false">Liquidados</button>
+      <button class="chip" data-f="noent" aria-pressed="false">Por entregar</button>
+    </div>
+    <div id="orders" class="orders"></div>
+  </section>
+
+  <section class="view" id="view-catalogo" hidden>
+    <div class="stats" id="inv-stats"></div>
+    <div class="toolbar">
+      <input class="search" id="q-cat" type="search" placeholder="Buscar modelo, marca, color o talla">
+      <div class="actions-row"><button class="btn primary" id="btn-new-model">+ Agregar modelo</button></div>
+    </div>
+    <div class="chips" id="f-cat" role="group" aria-label="Filtrar inventario">
+      <button class="chip" data-f="todos" aria-pressed="true">Todos</button>
+      <button class="chip" data-f="disp" aria-pressed="false">Con existencias</button>
+      <button class="chip" data-f="agot" aria-pressed="false">Agotados</button>
+    </div>
+    <div id="catalog" class="catalog"></div>
+  </section>
+
+  <section class="view" id="view-reportes" hidden>
+    <div class="toolbar">
+      <div class="field" style="flex:0 1 200px"><label for="rep-mes">Mes</label><input id="rep-mes" type="month"></div>
+      <div class="actions-row" style="margin-left:auto;align-self:end"><button class="btn xlsx-btn">Descargar Excel</button></div>
+    </div>
+    <div class="stats" id="rep-stats"></div>
+    <div class="rep-grid">
+      <div class="card"><h3>Cobrado por forma de pago</h3><div id="rep-metodos" class="list"></div></div>
+      <div class="card"><h3>Modelos más vendidos</h3><div id="rep-top" class="list"></div></div>
+      <div class="card"><h3>Clientes con saldo</h3><div id="rep-deudores" class="list"></div></div>
+      <div class="card"><h3>Inventario</h3><div id="rep-inv" class="list"></div></div>
+    </div>
+    <div class="backup">
+      <span>¿Tienes datos en la versión sin internet? Descarga ahí tu respaldo y cárgalo aquí.</span>
+      <span><label class="btn small" for="bk-file" style="cursor:pointer">Importar respaldo</label><input type="file" id="bk-file" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0"></span>
+    </div>
+  </section>
+</main>
+
+<nav class="bottomnav" aria-label="Secciones">
+  <a href="#ventas" data-tab="ventas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12l2 5H4z"/><path d="M4 7v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7"/><path d="M9 11a3 3 0 0 0 6 0"/></svg>Ventas<span class="badge" data-late hidden></span></a>
+  <a href="#catalogo" data-tab="catalogo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 17l3-8 5 3 3-4 9 5v3H2z"/><path d="M2 20h20"/></svg>Inventario</a>
+  <a href="#reportes" data-tab="reportes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>Reportes</a>
+</nav>
+
+<!-- Ventana: modelo -->
+<div class="overlay" id="ov-model" role="dialog" aria-modal="true" aria-labelledby="mdl-title">
+  <form class="sheet" id="form-model" novalidate>
+    <div class="sh"><h2 id="mdl-title">Agregar modelo</h2><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>
+    <div class="form">
+      <div class="field full">
+        <label for="m-foto">Foto</label>
+        <div class="photo-in"><div class="thumb" id="m-thumb"></div>
+          <div style="display:grid;gap:6px"><input type="file" id="m-foto" accept="image/*"><button type="button" class="btn small ghost" id="m-foto-del">Quitar foto</button></div></div>
+      </div>
+      <div class="field"><label for="m-marca">Marca</label><input id="m-marca" list="marcas" placeholder="Ej. PUMA"></div>
+      <div class="field"><label for="m-nombre">Modelo</label><input id="m-nombre" placeholder="Ej. Palermo"></div>
+      <div class="field full"><label for="m-color">Color</label><input id="m-color" placeholder="Ej. Negro / blanco"></div>
+      <div class="field"><label for="m-precio">Precio de venta</label><input id="m-precio" type="number" min="0" step="1" inputmode="decimal" placeholder="1600"></div>
+      <div class="field"><label for="m-costo">Lo que te costó</label><input id="m-costo" type="number" min="0" step="1" inputmode="decimal" placeholder="1100"><span class="hint" id="m-gan"></span></div>
+      <div class="field full">
+        <span class="lbl">Existencias por talla (MX)</span>
+        <span class="hint">Escribe cuántos pares tienes de cada talla. Deja en blanco las que no manejas. Se descuentan solas al vender.</span>
+        <div class="stockgrid" id="m-stock"></div>
+        <div style="display:flex;gap:6px;margin-top:4px"><input id="m-talla-extra" placeholder="Otra talla, ej. 32" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;flex:1;min-width:0"><button type="button" class="btn small" id="m-talla-add">Agregar talla</button></div>
+      </div>
+    </div>
+    <datalist id="marcas"><option value="adidas"><option value="Nike"><option value="PUMA"><option value="Under Armour"><option value="New Balance"><option value="Vans"><option value="Converse"><option value="Reebok"><option value="Jordan"></datalist>
+    <div class="row-end"><button type="button" class="btn ghost" data-close>Cancelar</button><button type="submit" class="btn primary" id="m-save">Guardar modelo</button></div>
+  </form>
+</div>
+
+<!-- Ventana: venta / apartado -->
+<div class="overlay" id="ov-order" role="dialog" aria-modal="true" aria-labelledby="ord-title">
+  <form class="sheet" id="form-order" novalidate>
+    <div class="sh"><h2 id="ord-title">Nueva venta</h2><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>
+    <div class="form">
+      <div class="field"><label for="o-cliente">Cliente</label><input id="o-cliente" list="clientes" autocomplete="off" placeholder="Nombre"><datalist id="clientes"></datalist></div>
+      <div class="field"><label for="o-tel">Teléfono</label><input id="o-tel" type="tel" inputmode="tel" placeholder="10 dígitos"></div>
+      <div class="field"><label for="o-modelo">Modelo</label><select id="o-modelo"></select></div>
+      <div class="field"><label for="o-talla">Talla</label><select id="o-talla"></select><input id="o-talla-libre" placeholder="Escribe la talla" style="display:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:42px"></div>
+      <div class="field full" id="o-modelo-libre-f" hidden><label for="o-modelo-libre">Escribe el modelo</label><input id="o-modelo-libre" placeholder="Marca, modelo y color"></div>
+      <div class="field"><label for="o-precio">Precio total</label><input id="o-precio" type="number" min="0" step="1" inputmode="decimal"></div>
+      <div class="field"><label for="o-fecha">Fecha</label><input id="o-fecha" type="date"></div>
+      <div class="field" id="o-anticipo-f"><label for="o-anticipo" id="o-anticipo-l">Anticipo</label><input id="o-anticipo" type="number" min="0" step="1" inputmode="decimal" placeholder="0"></div>
+      <div class="field" id="o-metodo-f"><label for="o-metodo">Forma de pago</label><select id="o-metodo"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option></select></div>
+      <div class="field" id="o-prox-f"><label for="o-prox">Próximo pago</label><input id="o-prox" type="date"><span class="hint">Fecha en que te debe dar el siguiente abono.</span></div>
+      <div class="field full"><label for="o-notas">Notas</label><textarea id="o-notas" placeholder="Ej. Lo recoge el sábado, quiere caja"></textarea></div>
+      <div class="field full" id="o-entregado-f"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:.95rem;color:var(--ink)"><input type="checkbox" id="o-entregado" style="width:auto;min-height:0"> Ya se entregó el par</label></div>
+    </div>
+    <div class="row-end"><button type="button" class="btn ghost" data-close>Cancelar</button><button type="submit" class="btn primary" id="o-save">Guardar</button></div>
+  </form>
+</div>
+
+<!-- Ventana: detalle -->
+<div class="overlay" id="ov-detail" role="dialog" aria-modal="true" aria-labelledby="det-title"><div class="sheet" id="detail"></div></div>
+
+<!-- Ventana: ticket -->
+<div class="overlay" id="ov-ticket" role="dialog" aria-modal="true" aria-labelledby="tk-title">
+  <div class="sheet" style="max-width:460px">
+    <div class="sh"><h2 id="tk-title">Ticket</h2><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>
+    <div class="ticket-prev"><img id="tk-img" alt="Ticket de venta"></div>
+    <div class="row-end" style="justify-content:flex-start">
+      <button class="btn primary" id="tk-share">Compartir</button>
+      <a class="btn" id="tk-wa" target="_blank" rel="noopener">WhatsApp del cliente</a>
+      <button class="btn" id="tk-print">Imprimir</button>
+      <button class="btn" id="tk-save">Guardar imagen</button>
+    </div>
+    <p class="hint" style="margin:0">En el celular, "Compartir" te deja mandarlo directo por WhatsApp. "Imprimir" funciona con impresoras de tickets de 80 mm o normales.</p>
+  </div>
+</div>
+
+<!-- Ventana: confirmar -->
+<div class="overlay" id="ov-confirm" role="alertdialog" aria-modal="true" aria-labelledby="cf-text">
+  <div class="sheet" style="max-width:420px">
+    <p id="cf-text" style="margin:0;font-size:1.05rem"></p>
+    <div class="row-end"><button class="btn ghost" id="cf-no">Cancelar</button><button class="btn primary" id="cf-yes">Sí, eliminar</button></div>
+  </div>
+</div>
+
+<!-- Inicio de sesión -->
+<div class="login" id="login">
+  <form class="login-card" id="login-form" novalidate>
+    <img src="logo.webp" alt="Logo de Shepo's Sneaker" width="120" height="120">
+    <h1>Shepo's <span>Sneaker</span></h1>
+    <p id="login-msg">Inicia sesión para entrar.</p>
+    <div class="field" id="lf-email"><label for="l-email">Correo</label><input id="l-email" type="email" autocomplete="username" inputmode="email"></div>
+    <div class="field" id="lf-pass"><label for="l-pass">Contraseña</label><input id="l-pass" type="password" autocomplete="current-password"></div>
+    <button class="btn primary" type="submit" id="l-go">Entrar</button>
+    <button class="btn ghost small" type="button" id="l-reset">Olvidé mi contraseña</button>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="print-area"></div>
+
+<script src="xlsx.mini.min.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

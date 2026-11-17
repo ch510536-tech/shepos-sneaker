@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Solo estas cuentas pueden ver y modificar los datos.
+    // Escribe los correos EN MINÚSCULAS, entre comillas y separados por comas.
+    function permitido() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'TU_CORREO@gmail.com',
+          'CORREO_DE_TU_SOCIO@gmail.com'
+        ];
+    }
+
+    match /modelos/{id} {
+      allow read, write: if permitido();
+    }
+    match /pedidos/{id} {
+      allow read, write: if permitido();
+    }
+  }
+}

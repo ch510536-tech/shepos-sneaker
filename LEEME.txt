@@ -1,0 +1,93 @@
+SHEPO'S SNEAKER - APP DE VENTAS, APARTADOS E INVENTARIO
+========================================================
+
+Esta carpeta es tu app. Usa:
+  - Firebase (de Google): guarda los datos y las cuentas de acceso.
+  - GitHub Pages: publica la app en internet (igual que Osito Golosito).
+Haz un proyecto de Firebase y un repositorio NUEVOS, para que los datos de
+los tenis no se mezclen con los de los dulces.
+
+-----------------------------------------------------------------
+PASO 1. Firebase: proyecto nuevo
+-----------------------------------------------------------------
+1. Entra a https://console.firebase.google.com y crea un proyecto nuevo
+   llamado shepos-sneaker (Google Analytics no se necesita).
+2. Compilación > Authentication > Comenzar > activa "Correo electrónico/
+   contraseña". En "Usuarios" > "Agregar usuario" crea tu cuenta y la de
+   tu socio.
+3. Compilación > Firestore Database > Crear base de datos > modo producción.
+4. En la pestaña "Reglas": abre firestore.rules con el Bloc de notas,
+   cambia los dos correos de ejemplo por el tuyo y el de tu socio
+   (EN MINÚSCULAS), copia todo, pégalo y toca "Publicar".
+5. Engrane > Configuración del proyecto > Tus apps > ícono web </> >
+   registra la app (sin Firebase Hosting) y copia los datos de
+   firebaseConfig.
+6. Abre config.js con el Bloc de notas, reemplaza los datos de ejemplo
+   por los tuyos (respeta comillas y comas) y guarda.
+
+-----------------------------------------------------------------
+PASO 2. GitHub Pages
+-----------------------------------------------------------------
+1. En GitHub crea un repositorio nuevo y público llamado shepos-sneaker.
+2. "Add file" > "Upload files" y arrastra TODOS los archivos de esta
+   carpeta (index.html, app.js, seed.js, config.js, sw.js, xlsx.mini.min.js,
+   manifest.webmanifest, logo.webp, los íconos .png, firestore.rules y este
+   LEEME). Deben quedar sueltos en la raíz, no dentro de otra carpeta.
+   Toca "Commit changes".
+3. Settings > Pages > "Deploy from a branch" > rama main, carpeta /(root)
+   > Save. En uno o dos minutos queda lista en:
+   https://TU-USUARIO.github.io/shepos-sneaker/
+
+Para actualizar la app más adelante: sube los archivos nuevos al mismo
+repositorio (reemplazan a los anteriores). Antes guarda tu config.js para
+no perder tus datos de Firebase.
+
+-----------------------------------------------------------------
+PASO 3. Instalarla en el iPhone
+-----------------------------------------------------------------
+Abre la dirección en Safari > botón de tres puntos > Compartir > baja a
+"Agregar a pantalla de inicio" > Agregar. Entra con tu correo y contraseña.
+En Android: Chrome > menú de tres puntos > "Instalar app".
+
+-----------------------------------------------------------------
+CÓMO SE USA
+-----------------------------------------------------------------
+VENTAS
+- "+ Venta de contado": eliges modelo, talla y forma de pago; se cobra el
+  total, se descuenta del inventario y sale el ticket.
+- "+ Apartado": cliente, modelo, talla, anticipo, forma de pago y fecha del
+  próximo pago. Si el cliente ya te compró antes, al escribir su nombre se
+  llena su teléfono.
+- Dentro de cada pedido: "Registrar pago" (con forma de pago y la fecha del
+  siguiente pago). Al guardar sale el ticket del abono.
+- Los pedidos con la fecha de pago vencida salen arriba en rojo como
+  "Atrasado", con un mensaje de recordatorio listo para WhatsApp.
+
+TICKETS
+- Cada pago tiene su ticket (botón "Ticket" en el historial) y hay un
+  "Ticket con estado de cuenta" con todos los pagos.
+- Compartir (manda la imagen por WhatsApp), Imprimir (impresora de tickets
+  de 80 mm o normal) o Guardar imagen.
+
+INVENTARIO
+- En cada modelo pon precio de venta, lo que te costó y cuántos pares
+  tienes por talla. Al vender o apartar se descuenta solo; si eliminas una
+  venta, el par regresa al inventario.
+- "Agregar mis 5 modelos" carga los tenis que ya tenías (luego ponles
+  precio, costo y existencias con Editar).
+
+REPORTES
+- Por mes: vendido, cobrado, ganancia, pares vendidos, cobrado por forma de
+  pago, modelos más vendidos, clientes con saldo e inventario.
+- "Descargar Excel" baja todo en un archivo con hojas de Resumen, Ventas,
+  Pagos e Inventario.
+- "Importar respaldo" pasa los datos de la versión sin internet.
+
+-----------------------------------------------------------------
+BUENO SABER
+-----------------------------------------------------------------
+- Lo que registra uno lo ve el otro al instante.
+- Sin internet la app sigue funcionando y sube los cambios al volver la
+  señal.
+- El plan gratuito de Firebase (Spark) alcanza de sobra para una tienda
+  pequeña y no pide tarjeta.
