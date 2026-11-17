@@ -124,10 +124,17 @@ a.btn,a.btn:visited{color:var(--ink)}
 .debt .who b{display:block}
 .debt .k{display:none;font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .debt .saldo{font-family:var(--display);font-size:1.25rem;color:#FF8A8E}
+.par{background:#0B2F44;border-radius:10px;padding:10px;display:grid;gap:6px}
+.par-h{display:flex;justify-content:space-between;align-items:center}
+.par-g{display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px}
+.par-g select,.par-g input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px;width:100%;min-width:0}
+.par-g .pml{grid-column:1/-1}
+@media (max-width:520px){.par-g{grid-template-columns:1fr 1fr}.par-g .pm{grid-column:1/-1}}
 .abrow{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center}
 .abrow input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px;width:100%;min-width:0}
 .acct{background:var(--panel);border-radius:12px;border-left:4px solid var(--line);padding:14px;display:grid;gap:10px}
 .acct.late{border-left-color:var(--red)}
+.acct.done{border-left-color:var(--ok)}
 .acct-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .acct-name{display:block;font-size:1.1rem}
 .acct-debe{text-align:right;flex:none}
@@ -139,6 +146,14 @@ button.acct-row:hover{filter:brightness(1.15)}
 .acct-row span:not(:first-child){text-align:right}
 .acct-rh{background:transparent;cursor:default;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-top:0;padding-bottom:0}
 .acct-tot{background:#071A27;font-weight:700;cursor:default}
+.ord-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:#0B2F44;border:0;border-radius:8px;padding:9px 10px;width:100%;text-align:left;font-size:.88rem;cursor:pointer}
+.ord-row:hover{filter:brightness(1.15)}
+.ord-row .no{font-family:var(--display);font-size:1.05rem;color:var(--muted);min-width:34px}
+.ord-row .rt{text-align:right;white-space:nowrap}
+.acct-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.acct-sum div{background:var(--panel);border-radius:10px;padding:8px}
+.acct-sum small{display:block;font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.acct-sum strong{font-family:var(--display);font-size:1.3rem}
 .acct-actions{display:flex;gap:8px;flex-wrap:wrap}
 @media (max-width:420px){.acct-row{grid-template-columns:1.4fr 1fr 1fr 1fr;font-size:.8rem;gap:5px;padding:8px}}
 .debt-total{display:flex;justify-content:space-between;padding:10px 14px;background:#071A27;border-radius:10px;font-weight:700}
@@ -297,6 +312,10 @@ td.amt.neg{color:#FF8A8E}
       </div>
       <input class="search" id="q-ped" type="search" placeholder="Buscar cliente, teléfono, modelo o número">
     </div>
+    <div class="seg" id="g-ped" role="group" aria-label="Cómo ver las ventas" style="max-width:420px">
+      <button type="button" data-g="cliente" aria-pressed="true">Por cliente</button>
+      <button type="button" data-g="venta" aria-pressed="false">Por venta</button>
+    </div>
     <div class="chips" id="f-ped" role="group" aria-label="Filtrar ventas">
       <button class="chip" data-f="todos" aria-pressed="true">Todas</button>
       <button class="chip" data-f="pend" aria-pressed="false">Con saldo</button>
@@ -395,16 +414,17 @@ td.amt.neg{color:#FF8A8E}
     <div class="form">
       <div class="field"><label for="o-cliente">Cliente</label><input id="o-cliente" list="clientes" autocomplete="off" placeholder="Nombre"><datalist id="clientes"></datalist></div>
       <div class="field"><label for="o-tel">Teléfono</label><input id="o-tel" type="tel" inputmode="tel" placeholder="10 dígitos"></div>
-      <div class="field"><label for="o-modelo">Modelo</label><select id="o-modelo"></select></div>
-      <div class="field"><label for="o-talla">Talla</label><select id="o-talla"></select><input id="o-talla-libre" placeholder="Escribe la talla" style="display:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:42px"></div>
-      <div class="field full" id="o-modelo-libre-f" hidden><label for="o-modelo-libre">Escribe el modelo</label><input id="o-modelo-libre" placeholder="Marca, modelo y color"></div>
-      <div class="field"><label for="o-precio">Precio total</label><input id="o-precio" type="number" min="0" step="1" inputmode="decimal"></div>
+      <div class="field full">
+        <span class="lbl" id="o-pares-l">Pares</span>
+        <div id="o-pares" style="display:grid;gap:8px"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><button type="button" class="btn small" id="o-add-par">+ Agregar otro par</button><b class="num" id="o-total"></b></div>
+      </div>
       <div class="field"><label for="o-fecha">Fecha</label><input id="o-fecha" type="date"></div>
       <div class="field" id="o-anticipo-f"><label for="o-anticipo" id="o-anticipo-l">Anticipo</label><input id="o-anticipo" type="number" min="0" step="1" inputmode="decimal" placeholder="0"></div>
       <div class="field" id="o-metodo-f"><label for="o-metodo">Forma de pago</label><select id="o-metodo"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option></select></div>
       <div class="field" id="o-prox-f"><label for="o-prox">Próximo pago</label><input id="o-prox" type="date"><span class="hint">Fecha en que te debe dar el siguiente abono.</span></div>
       <div class="field full"><label for="o-notas">Notas</label><textarea id="o-notas" placeholder="Ej. Lo recoge el sábado, quiere caja"></textarea></div>
-      <div class="field full" id="o-entregado-f"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:.95rem;color:var(--ink)"><input type="checkbox" id="o-entregado" style="width:auto;min-height:0"> Ya se entregó el par</label></div>
+      <div class="field full" id="o-entregado-f"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:.95rem;color:var(--ink)"><input type="checkbox" id="o-entregado" style="width:auto;min-height:0"> Ya se entregó (o se entregaron) el par</label></div>
     </div>
     <div class="row-end"><button type="button" class="btn ghost" data-close>Cancelar</button><button type="submit" class="btn primary" id="o-save">Guardar</button></div>
   </form>

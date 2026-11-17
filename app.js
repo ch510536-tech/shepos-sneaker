@@ -23,7 +23,7 @@ const METODOS={efectivo:"Efectivo",tarjeta:"Tarjeta",transferencia:"Transferenci
 const BIZ_PHONE="282 104 8780";
 const sortSizes=a=>a.slice().sort((x,y)=>(parseFloat(x)-parseFloat(y))||String(x).localeCompare(String(y)));
 
-const state={user:null,modelos:[],pedidos:[],mode:"loading",view:"ventas",filter:"todos",catFilter:"todos",debtFilter:"todos",qd:"",acctKey:null,qp:"",qc:"",openId:null,payType:"abono",repMes:today().slice(0,7)};
+const state={user:null,modelos:[],pedidos:[],mode:"loading",view:"ventas",filter:"todos",catFilter:"todos",debtFilter:"todos",qd:"",acctKey:null,groupBy:"cliente",qp:"",qc:"",openId:null,payType:"abono",repMes:today().slice(0,7)};
 
 /* ================= Firebase ================= */
 let fs=null,auth=null,unsubs=[];
@@ -124,7 +124,7 @@ function renderStats(){
   for(const p of state.pedidos){const c=calc(p);if(p.fecha&&p.fecha.startsWith(mes))vend+=c.total;if(c.saldo>0)pen+=c.saldo;if(c.late)late++;
     for(const m of c.movs)if(m.fecha===hoy&&!m.inicial)cobHoy+=m.tipo==="resta"?-num(m.monto):num(m.monto)}
   $("#st-mes").textContent=money(vend);$("#st-hoy").textContent=money(cobHoy);$("#st-pen").textContent=money(pen);$("#st-late").textContent=late}
-function renderOrders(){
+function renderOrdersFlat(){
   const el=$("#orders");
   if(state.mode==="loading"){el.innerHTML='<div class="empty">Cargando ventas…</div>';return}
   if(!state.pedidos.length){el.innerHTML='<div class="empty"><strong>Aún no hay ventas</strong>Registra una venta de contado o un apartado con su anticipo.<span class="actions-row" style="justify-content:center"><button class="btn light" data-act="contado">+ Venta de contado</button><button class="btn primary" data-act="apartado">+ Apartado</button></span></div>';return}
@@ -144,6 +144,33 @@ function renderOrders(){
     (p.tipo==="contado"&&c.saldo<=0?'':'<div class="bar"><i class="'+(c.pct>=100?'full':'')+'" style="width:'+c.pct.toFixed(1)+'%"></i></div>')+
     '<div class="money num"><span>Pagado <b>'+money(c.pagado)+'</b> de '+money(c.total)+'</span><span>Saldo <b style="color:'+(c.saldo>0?'#FF8A8E':'#6EE0A0')+'">'+money(Math.max(c.saldo,0))+'</b></span></div>'+
   '</button>'}).join("")}
+
+function orderMatches(p,c,q){
+  if(state.filter==="pend"&&!(c.saldo>0))return false;
+  if(state.filter==="late"&&!c.late)return false;
+  if(state.filter==="liq"&&!(c.saldo<=0&&c.total>0))return false;
+  if(state.filter==="noent"&&p.entregado)return false;
+  return !q||[p.cliente,p.telefono,digits(p.telefono),p.modelo,p.talla,"pedido "+p.numero,"#"+p.numero,String(p.numero)].join(" ").toLowerCase().includes(q)}
+function ordRow(p,c){return '<button class="ord-row" data-open="'+esc(p.id)+'"><span class="no">#'+esc(p.numero)+'</span><span>'+esc(itemName(p))+'<br><span class="meta">'+(p.fecha?esc(fdate(p.fecha)):'Sin fecha')+(p.tipo==="contado"?' · Contado':'')+(p.entregado?' · Entregado':' · Por entregar')+'</span></span>'+
+  '<span class="rt num">'+money(c.total)+'<br>'+(c.saldo>0?'<span style="color:#FF8A8E;font-weight:700">Debe '+money(c.saldo)+'</span>':'<span class="pill ok">Pagado</span>')+(c.late?' <span class="pill late">Atrasado</span>':'')+'</span></button>'}
+function renderOrders(){
+  if(state.groupBy!=="cliente"){renderOrdersFlat();return}
+  const el=$("#orders");
+  if(state.mode==="loading"){el.innerHTML='<div class="empty">Cargando ventas…</div>';return}
+  if(!state.pedidos.length){renderOrdersFlat();return}
+  const q=state.qp.trim().toLowerCase();
+  const gs=cuentas(false).map(g=>{const nameHit=q&&(g.nombre+" "+g.tel+" "+digits(g.tel)).toLowerCase().includes(q);
+      const its=g.items.filter(({p,c})=>orderMatches(p,c,nameHit?"":q));return {g,its}}).filter(x=>x.its.length)
+    .sort((a,b)=>(b.g.late-a.g.late)||(lastDate(b.g).localeCompare(lastDate(a.g))));
+  if(!gs.length){el.innerHTML='<div class="empty">Ninguna venta coincide con la búsqueda o el filtro.</div>';return}
+  el.innerHTML=gs.map(({g,its})=>{const n=g.items.length;return '<article class="acct'+(g.late?' late':g.saldo<=0?' done':'')+'">'+
+    '<div class="acct-head"><div><b class="acct-name">'+esc(g.nombre)+'</b><span class="meta">'+(g.tel?esc(fphone(g.tel))+' · ':'')+pedCount(g)+' · Compró '+money(g.total)+(g.late?' <span class="pill late">Atrasado</span>':'')+'</span></div>'+
+      '<div class="acct-debe"><small>'+(g.saldo>0?'Debe':'Al corriente')+'</small><span class="num" style="'+(g.saldo>0?'':'color:#6EE0A0')+'">'+money(g.saldo)+'</span></div></div>'+
+    '<div class="acct-rows">'+its.map(({p,c})=>ordRow(p,c)).join("")+(its.length<n?'<span class="hint">'+(n-its.length)+' pedido(s) más no coinciden con el filtro.</span>':'')+'</div>'+
+    '<div class="acct-actions"><button class="btn small" data-acct="'+esc(g.key)+'">Ver historial'+(g.saldo>0?' y abonar':'')+'</button></div>'+
+  '</article>'}).join("")}
+function pedCount(g){const o=new Set(g.items.map(({p})=>p.orden||p.id)).size,n=g.items.length;return o+(o===1?' pedido':' pedidos')+(n>o?' · '+n+' pares':'')}
+function lastDate(g){return g.items.reduce((m,{p})=>{const d=p.fecha||"";return d>m?d:m},"")}
 
 /* ================= Inventario ================= */
 function renderCatalog(){
@@ -215,28 +242,36 @@ function renderDebts(){
 function cuentaMsg(g){return "Hola "+g.nombre+", te saluda Shepo's Sneaker 👟\nEste es tu estado de cuenta:\n"+
   g.items.map(({p,c})=>"• "+itemName(p)+": precio "+money(c.total)+", abonado "+money(c.pagado)+", debe "+money(c.saldo)).join("\n")+
   "\nTotal que debes: "+money(g.saldo)+(g.prox?"\nPróximo pago: "+fdate(g.prox):"")+"\n¡Gracias!"}
+function cuentaDe(key){return cuentas(false).find(g=>g.key===key)}
 function renderAcct(){
-  const g=cuentaPend(state.acctKey);
+  const g=cuentaDe(state.acctKey);
   if(!g){closeOv("#ov-acct");return}
+  const pend=g.items.filter(x=>x.c.saldo>0);const debe=pend.reduce((a,x)=>a+x.c.saldo,0);
   const keep=id=>$(id)?$(id).value:null;
   const kAmt=keep("#a-monto")||"",kM=keep("#a-metodo")||"efectivo",kF=keep("#a-fecha")||today(),kP=keep("#a-prox"),kN=keep("#a-nota")||"";
-  const wa=waLink(g.tel,cuentaMsg(g));
-  $("#acct").innerHTML='<div class="sh"><div><h2 id="acct-title">Cuenta de '+esc(g.nombre)+'</h2><span class="meta">'+(g.tel?esc(fphone(g.tel))+' · ':'')+g.items.length+(g.items.length>1?' artículos con saldo':' artículo con saldo')+'</span></div><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>'+
-    '<div class="acct-rows"><div class="acct-row acct-rh"><span>Artículo</span><span>Precio</span><span>Abonado</span><span>Debe</span></div>'+
-    g.items.map(({p,c})=>'<button class="acct-row" data-open="'+esc(p.id)+'"><span>'+esc(itemName(p))+(c.late?' <span class="pill late">Atrasado</span>':'')+'</span><span class="num">'+money(c.total)+'</span><span class="num">'+money(c.pagado)+'</span><span class="num" style="color:#FF8A8E;font-weight:700">'+money(c.saldo)+'</span></button>').join("")+
-    '<div class="acct-row acct-tot"><span>Total</span><span class="num">'+money(g.total)+'</span><span class="num">'+money(g.pagado)+'</span><span class="num">'+money(g.saldo)+'</span></div></div>'+
+  const gp=cuentaPend(g.key);const wa=gp?waLink(g.tel,cuentaMsg(gp)):"";
+  const hist=g.items.slice().sort((x,y)=>(y.p.fecha||"").localeCompare(x.p.fecha||"")||num(y.p.numero)-num(x.p.numero));
+  $("#acct").innerHTML='<div class="sh"><div><h2 id="acct-title">'+esc(g.nombre)+'</h2><span class="meta">'+(g.tel?esc(fphone(g.tel))+' · ':'')+pedCount(g)+'</span></div><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>'+
+    '<div class="acct-sum num"><div><small>Ha comprado</small><strong>'+money(g.total)+'</strong></div><div><small>Ha pagado</small><strong>'+money(g.pagado)+'</strong></div><div><small>Debe</small><strong style="color:'+(debe>0?'#FF8A8E':'#6EE0A0')+'">'+money(debe)+'</strong></div></div>'+
+    (pend.length?
+    '<div><h3 style="font-size:1.1rem;text-transform:uppercase;margin-bottom:6px">Lo que debe</h3><div class="acct-rows"><div class="acct-row acct-rh"><span>Artículo</span><span>Precio</span><span>Abonado</span><span>Debe</span></div>'+
+    pend.map(({p,c})=>'<button class="acct-row" data-open="'+esc(p.id)+'"><span>'+esc(itemName(p))+(c.late?' <span class="pill late">Atrasado</span>':'')+'</span><span class="num">'+money(c.total)+'</span><span class="num">'+money(c.pagado)+'</span><span class="num" style="color:#FF8A8E;font-weight:700">'+money(c.saldo)+'</span></button>').join("")+
+    (pend.length>1?'<div class="acct-row acct-tot"><span>Total</span><span class="num">'+money(pend.reduce((a,x)=>a+x.c.total,0))+'</span><span class="num">'+money(pend.reduce((a,x)=>a+x.c.pagado,0))+'</span><span class="num">'+money(debe)+'</span></div>':'')+'</div></div>'+
     '<form class="payform" id="acctform" novalidate>'+
       '<div class="full"><b>Abonar a la cuenta</b><br><span class="hint">El abono se aplica primero al artículo más antiguo y lo que sobre pasa al siguiente.</span></div>'+
-      '<div class="field"><label for="a-monto">Cantidad</label><input id="a-monto" type="number" min="0" step="1" inputmode="decimal" placeholder="'+g.saldo+'" value="'+esc(kAmt)+'"></div>'+
+      '<div class="field"><label for="a-monto">Cantidad</label><input id="a-monto" type="number" min="0" step="1" inputmode="decimal" placeholder="'+debe+'" value="'+esc(kAmt)+'"></div>'+
       '<div class="field"><label for="a-metodo">Forma de pago</label><select id="a-metodo">'+Object.entries(METODOS).map(([k,v])=>'<option value="'+k+'"'+(k===kM?' selected':'')+'>'+v+'</option>').join("")+'</select></div>'+
       '<div class="field"><label for="a-fecha">Fecha</label><input id="a-fecha" type="date" value="'+esc(kF)+'"></div>'+
-      '<div class="field"><label for="a-prox">Siguiente pago</label><input id="a-prox" type="date" value="'+esc(kP!=null?kP:(g.prox&&g.prox>=today()?g.prox:addDays(today(),15)))+'"></div>'+
+      '<div class="field"><label for="a-prox">Siguiente pago</label><input id="a-prox" type="date" value="'+esc(kP!=null?kP:(gp&&gp.prox&&gp.prox>=today()?gp.prox:addDays(today(),15)))+'"></div>'+
       '<div class="field full"><label for="a-nota">Nota (opcional)</label><input id="a-nota" value="'+esc(kN)+'"></div>'+
-      '<div class="full row-end"><button type="button" class="btn ghost small" data-aact="todo">Pagar todo ('+money(g.saldo)+')</button><button type="submit" class="btn primary">Guardar y ver ticket</button></div>'+
-    '</form>'+
-    '<div class="row-end" style="justify-content:flex-start"><button class="btn" data-aact="ticket">Ticket de la cuenta</button>'+(wa?'<a class="btn" href="'+esc(wa)+'" target="_blank" rel="noopener">Mandar estado por WhatsApp</a>':'')+'</div>'}
+      '<div class="full row-end"><button type="button" class="btn ghost small" data-aact="todo">Pagar todo ('+money(debe)+')</button><button type="submit" class="btn primary">Guardar y ver ticket</button></div>'+
+    '</form>':'<p class="notice" style="margin:0;background:rgba(47,179,107,.12);border-color:rgba(47,179,107,.4);color:#B8F0CF">Está al corriente: no debe nada.</p>')+
+    '<div><h3 style="font-size:1.1rem;text-transform:uppercase;margin-bottom:6px">Historial de pedidos</h3><div class="acct-rows">'+hist.map(({p,c})=>ordRow(p,c)).join("")+'</div></div>'+
+    '<div class="row-end" style="justify-content:flex-start">'+(pend.length?'<button class="btn" data-aact="ticket">Ticket de la cuenta</button>':'')+(wa?'<a class="btn" href="'+esc(wa)+'" target="_blank" rel="noopener">Mandar estado por WhatsApp</a>':'')+'<button class="btn" data-aact="nuevo">+ Nuevo apartado para '+esc(g.nombre.split(" ")[0])+'</button></div>'}
 function openAcct(key){state.acctKey=key;$("#acct").innerHTML="";renderAcct();openOv("#ov-acct")}
-$("#acct").addEventListener("click",e=>{const b=e.target.closest("[data-aact]");if(!b)return;const g=cuentaPend(state.acctKey);if(!g)return;
+$("#acct").addEventListener("click",e=>{const b=e.target.closest("[data-aact]");if(!b)return;
+  if(b.dataset.aact==="nuevo"){const g0=cuentaDe(state.acctKey);if(!g0)return;closeOv("#ov-acct");openOrder(null,{kind:"apartado",cliente:g0.nombre,tel:g0.tel||""});return}
+  const g=cuentaPend(state.acctKey);if(!g)return;
   if(b.dataset.aact==="todo")$("#a-monto").value=g.saldo;
   if(b.dataset.aact==="ticket")showCuentaTicket(g.key,null)});
 $("#acct").addEventListener("submit",e=>{if(e.target.id!=="acctform")return;e.preventDefault();
@@ -329,7 +364,7 @@ function renderDetail(){
   const kAmt=keep("#p-monto")||"",kNota=keep("#p-nota")||"",kF=keep("#p-fecha")||today(),kM=keep("#p-metodo")||"efectivo",kProx=keep("#p-prox");
   const proxDefault=p.proximoPago&&p.proximoPago>=today()?p.proximoPago:addDays(today(),15);
   $("#detail").innerHTML=
-   '<div class="sh"><div><h2 id="det-title">'+(p.tipo==="contado"?"Venta ":"Pedido ")+esc(p.numero)+'</h2><span class="pills" style="margin-top:4px">'+(p.tipo==="contado"?'<span class="pill cash">Contado</span>':'')+(c.late?'<span class="pill late">Atrasado</span>':'')+(p.entregado?'<span class="pill del">Entregado</span>':'<span class="pill warn">Por entregar</span>')+'<span class="pill '+c.est+'">'+c.lab+'</span></span></div><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>'+
+   '<div class="sh"><div><h2 id="det-title">'+(p.tipo==="contado"?"Venta ":"Pedido ")+esc(p.numero)+(num(p.pares)>1?' <span style="font-size:1rem;color:var(--muted)">· par '+esc(p.par)+' de '+esc(p.pares)+'</span>':'')+'</h2><span class="pills" style="margin-top:4px">'+(p.tipo==="contado"?'<span class="pill cash">Contado</span>':'')+(c.late?'<span class="pill late">Atrasado</span>':'')+(p.entregado?'<span class="pill del">Entregado</span>':'<span class="pill warn">Por entregar</span>')+'<span class="pill '+c.est+'">'+c.lab+'</span></span></div><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>'+
    '<div class="detail-grid"><div><small>Cliente</small>'+esc(p.cliente||"—")+'</div><div><small>Teléfono</small>'+(p.telefono?esc(fphone(p.telefono)):'—')+'</div>'+
    '<div><small>Modelo</small>'+esc(p.modelo||"—")+'</div><div><small>Talla</small>'+esc(p.talla||"—")+'</div>'+
    '<div><small>Fecha</small>'+esc(fdate(p.fecha))+'</div><div><small>Próximo pago</small>'+(c.saldo>0&&p.proximoPago?'<span style="color:'+(c.late?'#FF8A8E':'inherit')+'">'+esc(fdate(p.proximoPago))+(c.late?' (atrasado)':'')+'</span>':'—')+'</div>'+
@@ -402,79 +437,95 @@ $("#form-model").addEventListener("submit",e=>{e.preventDefault();
     tallas:sortSizes(Object.keys(stock).filter(k=>stock[k]>0)),foto:modelFoto,creado:prev&&prev.creado?prev.creado:Date.now()};
   if(save("modelos",editModelId||uid(),data)){closeOv("#ov-model");toast(editModelId?"Modelo actualizado":"Modelo agregado al inventario")}});
 
-/* ================= Formulario de venta / apartado ================= */
+/* ================= Formulario de venta / apartado (1 a 5 pares) ================= */
+const MAX_PARES=5;
 let editOrderId=null,orderKind="apartado";
-function fillModelSelect(sel){
-  const opts=state.modelos.slice().sort((a,b)=>modelLabel(a).localeCompare(modelLabel(b)));
-  $("#o-modelo").innerHTML='<option value="">Elige un modelo</option>'+opts.map(m=>{const t=stockTotal(m),c=hasCounts(m);return '<option value="'+esc(m.id)+'">'+esc(modelLabel(m))+(c?(t?' ('+t+')':' (agotado)'):'')+'</option>'}).join("")+'<option value="__otro">Otro (escribir)</option>';
-  $("#o-modelo").value=sel||""}
-function fillSizes(keepTalla){
-  const v=$("#o-modelo").value;const m=state.modelos.find(x=>x.id===v);
-  $("#o-modelo-libre-f").hidden=v!=="__otro";
-  const st=m?stockOf(m):{};const keys=sortSizes(Object.keys(st));
-  const sel=$("#o-talla"),libre=$("#o-talla-libre");
-  if(m&&keys.length){sel.style.display="";libre.style.display="none";
-    sel.innerHTML='<option value="">Elige talla</option>'+keys.map(k=>{const q=st[k];const out=q!=null&&num(q)<=0;return '<option value="'+esc(k)+'"'+(out&&k!==keepTalla?' disabled':'')+'>'+esc(k)+(q!=null?(out?' · agotada':' · '+q+' disp.'):'')+'</option>'}).join("")+'<option value="__otra">Otra talla</option>';
-    sel.value=keepTalla&&keys.includes(keepTalla)?keepTalla:(keepTalla?"__otra":"");if(sel.value==="__otra"){libre.style.display="";libre.value=keepTalla||""}}
-  else{sel.style.display="none";libre.style.display="";libre.value=keepTalla||""}}
-$("#o-modelo").addEventListener("change",()=>{fillSizes("");const m=state.modelos.find(x=>x.id===$("#o-modelo").value);if(m&&num(m.precio)>0)$("#o-precio").value=m.precio});
-$("#o-talla").addEventListener("change",()=>{const o=$("#o-talla").value==="__otra";$("#o-talla-libre").style.display=o?"":"none";if(o)$("#o-talla-libre").focus()});
-$("#o-cliente").addEventListener("change",()=>{const n=$("#o-cliente").value.trim().toLowerCase();const c=clientes().find(x=>x.nombre.toLowerCase()===n);if(c&&c.tel&&!$("#o-tel").value)$("#o-tel").value=c.tel});
+function modelOptions(){return '<option value="">Elige un modelo</option>'+state.modelos.slice().sort((a,b)=>modelLabel(a).localeCompare(modelLabel(b))).map(m=>{const t=stockTotal(m),c=hasCounts(m);return '<option value="'+esc(m.id)+'">'+esc(modelLabel(m))+(c?(t?' ('+t+')':' (agotado)'):'')+'</option>'}).join("")+'<option value="__otro">Otro (escribir)</option>'}
+function parRowHTML(){return '<div class="par"><div class="par-h"><b class="par-n">Par</b><button type="button" class="btn small ghost" data-par-del>✕ Quitar</button></div>'+
+  '<div class="par-g"><select class="pm" aria-label="Modelo">'+modelOptions()+'</select><input class="pml" placeholder="Escribe el modelo (marca, modelo y color)" hidden aria-label="Modelo escrito">'+
+  '<select class="pt" aria-label="Talla"></select><input class="ptl" placeholder="Talla" hidden aria-label="Talla escrita">'+
+  '<input class="pp" type="number" min="0" step="1" inputmode="decimal" placeholder="Precio" aria-label="Precio"></div></div>'}
+function fillRowSizes(row,keep){
+  const m=state.modelos.find(x=>x.id===row.querySelector(".pm").value);
+  row.querySelector(".pml").hidden=row.querySelector(".pm").value!=="__otro";
+  const st=m?stockOf(m):{};const keys=sortSizes(Object.keys(st));const sel=row.querySelector(".pt"),lib=row.querySelector(".ptl");
+  if(m&&keys.length){sel.hidden=false;
+    sel.innerHTML='<option value="">Talla</option>'+keys.map(k=>{const q=st[k];const out=q!=null&&num(q)<=0;return '<option value="'+esc(k)+'"'+(out&&k!==keep?' disabled':'')+'>'+esc(k)+(q!=null?(out?' · agotada':' · '+q+' disp.'):'')+'</option>'}).join("")+'<option value="__otra">Otra talla</option>';
+    sel.value=keep&&keys.includes(keep)?keep:(keep?"__otra":"");lib.hidden=sel.value!=="__otra";if(!lib.hidden)lib.value=keep||""}
+  else{sel.hidden=true;lib.hidden=false;lib.value=keep||""}}
+function addParRow(preset){const box=$("#o-pares");if(box.children.length>=MAX_PARES){toast("Máximo "+MAX_PARES+" pares por pedido.");return}
+  box.insertAdjacentHTML("beforeend",parRowHTML());const row=box.lastElementChild;
+  if(preset){row.querySelector(".pm").value=preset.modelId||"";if(preset.modelId==="__otro")row.querySelector(".pml").value=preset.modelo||"";fillRowSizes(row,preset.talla||"");if(preset.precio)row.querySelector(".pp").value=preset.precio}
+  else fillRowSizes(row,"");
+  updPares()}
+function updPares(){const rows=$$("#o-pares .par");const editing=!!editOrderId;
+  rows.forEach((r,i)=>{r.querySelector(".par-n").textContent=rows.length>1?"Par "+(i+1):"Par";r.querySelector("[data-par-del]").hidden=rows.length<2});
+  $("#o-add-par").hidden=editing||rows.length>=MAX_PARES;
+  $("#o-pares-l").textContent=editing?"Par":"Pares ("+rows.length+" de "+MAX_PARES+")";
+  const tot=rows.reduce((a,r)=>a+num(r.querySelector(".pp").value),0);
+  $("#o-total").textContent=rows.length>1&&tot>0?"Total: "+money(tot):"";
+  $("#o-entregado-f").querySelector("label").lastChild.textContent=rows.length>1?" Ya se entregaron los pares":" Ya se entregó el par"}
+$("#o-pares").addEventListener("change",e=>{const row=e.target.closest(".par");if(!row)return;
+  if(e.target.classList.contains("pm")){fillRowSizes(row,"");const m=state.modelos.find(x=>x.id===e.target.value);if(m&&num(m.precio)>0)row.querySelector(".pp").value=m.precio;updPares()}
+  if(e.target.classList.contains("pt")){const lib=row.querySelector(".ptl");lib.hidden=e.target.value!=="__otra";if(!lib.hidden)lib.focus()}});
+$("#o-pares").addEventListener("input",e=>{if(e.target.classList.contains("pp"))updPares()});
+$("#o-pares").addEventListener("click",e=>{const b=e.target.closest("[data-par-del]");if(!b)return;b.closest(".par").remove();updPares()});
+$("#o-add-par").onclick=()=>{addParRow();const r=$("#o-pares").lastElementChild;if(r)r.querySelector(".pm").focus()};
+function readPares(){return $$("#o-pares .par").map(r=>{const sel=r.querySelector(".pm").value;const m=state.modelos.find(x=>x.id===sel);
+  const t=r.querySelector(".pt");const talla=!t.hidden&&t.value!=="__otra"?t.value:r.querySelector(".ptl").value.trim();
+  return {m,modelo:sel==="__otro"?r.querySelector(".pml").value.trim():m?modelLabel(m):"",talla,precio:num(r.querySelector(".pp").value)}})}
+$("#o-cliente").addEventListener("change",()=>{const n=normName($("#o-cliente").value);const c=clientes().find(x=>normName(x.nombre)===n);if(c&&c.tel&&!$("#o-tel").value)$("#o-tel").value=c.tel});
 function setKindUI(kind,editing){
   const contado=kind==="contado";
-  $("#o-anticipo-f").hidden=editing||contado;$("#o-prox-f").hidden=contado&&!editing?true:false;
-  if(editing&&kind==="contado")$("#o-prox-f").hidden=true;
+  $("#o-anticipo-f").hidden=editing||contado;$("#o-prox-f").hidden=contado;
   $("#o-metodo-f").hidden=editing;$("#o-entregado-f").hidden=contado&&!editing;
   $("#o-save").textContent=editing?"Guardar cambios":contado?"Cobrar y ver ticket":"Guardar apartado"}
 function openOrder(p,opts){opts=opts||{};editOrderId=p?p.id:null;orderKind=p?(p.tipo||"apartado"):(opts.kind||"apartado");
   $("#ord-title").textContent=p?"Editar "+(orderKind==="contado"?"venta ":"pedido ")+p.numero:(orderKind==="contado"?"Venta de contado ":"Apartado ")+"#"+nextNumber();
   $("#clientes").innerHTML=clientes().map(c=>'<option value="'+esc(c.nombre)+'">'+esc(fphone(c.tel))+'</option>').join("");
-  $("#o-cliente").value=p?p.cliente||"":"";$("#o-tel").value=p?p.telefono||"":"";$("#o-fecha").value=p?p.fecha||today():today();
-  $("#o-precio").value=p?p.precio||"":"";$("#o-notas").value=p?p.notas||"":"";$("#o-entregado").checked=!!(p&&p.entregado);
+  $("#o-cliente").value=p?p.cliente||"":(opts.cliente||"");$("#o-tel").value=p?p.telefono||"":(opts.tel||"");$("#o-fecha").value=p?p.fecha||today():today();
+  $("#o-notas").value=p?p.notas||"":"";$("#o-entregado").checked=!!(p&&p.entregado);
   $("#o-anticipo").value="";$("#o-metodo").value="efectivo";$("#o-prox").value=p?(p.proximoPago||""):addDays(today(),15);
-  let sel=opts.modelId||"";if(p)sel=p.modeloId&&state.modelos.some(m=>m.id===p.modeloId)?p.modeloId:(p.modelo?"__otro":"");
-  fillModelSelect(sel);$("#o-modelo-libre").value=p&&sel==="__otro"?p.modelo||"":"";fillSizes(p?p.talla||"":"");
-  if(!p&&opts.modelId){const m=state.modelos.find(x=>x.id===opts.modelId);if(m&&num(m.precio)>0)$("#o-precio").value=m.precio}
-  setKindUI(orderKind,!!p);openOv("#ov-order");setTimeout(()=>{try{$("#o-cliente").focus()}catch(e){}},50)}
+  $("#o-pares").innerHTML="";
+  if(p){const sel=p.modeloId&&state.modelos.some(m=>m.id===p.modeloId)?p.modeloId:(p.modelo?"__otro":"");addParRow({modelId:sel,modelo:p.modelo,talla:p.talla,precio:p.precio})}
+  else{const m=opts.modelId?state.modelos.find(x=>x.id===opts.modelId):null;addParRow(m?{modelId:m.id,precio:num(m.precio)||""}:null)}
+  setKindUI(orderKind,!!p);updPares();openOv("#ov-order");setTimeout(()=>{try{(opts.cliente?$("#o-pares .pm"):$("#o-cliente")).focus()}catch(e){}},50)}
+function takeStock(m,talla){if(!m||!talla)return null;const st=stockOf(m);if(talla in st&&st[talla]!=null){if(num(st[talla])<=0)toast("Ojo: la talla "+talla+" de "+modelLabel(m)+" estaba agotada.");if(adjustStock(m.id,talla,-1))return {modeloId:m.id,talla}}return null}
 $("#form-order").addEventListener("submit",e=>{e.preventDefault();
-  const cliente=$("#o-cliente").value.trim(),precio=num($("#o-precio").value);
-  const contado=orderKind==="contado";
+  const cliente=$("#o-cliente").value.trim(),contado=orderKind==="contado";
   if(!cliente&&!contado){toast("Escribe el nombre del cliente.");return}
-  if(!(precio>0)){toast("Escribe el precio total.");return}
-  const sel=$("#o-modelo").value;const m=state.modelos.find(x=>x.id===sel);
-  const modelo=sel==="__otro"?$("#o-modelo-libre").value.trim():m?modelLabel(m):"";
-  const tSel=$("#o-talla").style.display!=="none"?$("#o-talla").value:"__otra";
-  const talla=tSel==="__otra"?$("#o-talla-libre").value.trim():tSel;
-  if(m&&hasCounts(m)&&!talla){toast("Elige la talla.");return}
+  const pares=readPares();
+  for(let i=0;i<pares.length;i++){const x=pares[i],n=pares.length>1?" del par "+(i+1):"";
+    if(!(x.precio>0)){toast("Escribe el precio"+n+".");return}
+    if(x.m&&hasCounts(x.m)&&!x.talla){toast("Elige la talla"+n+".");return}}
+  const fecha=$("#o-fecha").value||today(),tel=$("#o-tel").value.trim(),notas=$("#o-notas").value.trim();
   const prev=editOrderId?state.pedidos.find(x=>x.id===editOrderId):null;
-  const fecha=$("#o-fecha").value||today();
-  const movs=prev&&Array.isArray(prev.movimientos)?prev.movimientos.map(x=>({...x})):[];
-  let newMov=null;
-  if(!prev){
-    const metodo=$("#o-metodo").value;
-    if(contado)newMov={id:uid(),fecha,hora:nowHM(),tipo:"abono",monto:precio,metodo,nota:"Pago de contado"};
-    else{const ant=num($("#o-anticipo").value);if(ant>precio){toast("El anticipo no puede ser mayor que el precio.");return}
-      if(ant>0)newMov={id:uid(),fecha,hora:nowHM(),tipo:"abono",monto:ant,metodo,nota:"Anticipo"}}
-    if(newMov)movs.push(newMov)}
-  /* Inventario: devolver el par anterior y descontar el nuevo */
-  let stockRef=prev&&prev.stockRef?prev.stockRef:null;
-  const changed=!prev||!stockRef||stockRef.modeloId!==(m?m.id:"")||stockRef.talla!==talla;
-  if(changed){
-    if(stockRef)adjustStock(stockRef.modeloId,stockRef.talla,+1);
-    stockRef=null;
-    if(m&&talla){const st=stockOf(m);if(talla in st&&st[talla]!=null){if(num(st[talla])<=0)toast("Ojo: esa talla estaba agotada en tu inventario.");if(adjustStock(m.id,talla,-1))stockRef={modeloId:m.id,talla}}}}
-  const data={numero:prev?prev.numero:nextNumber(),tipo:prev?(prev.tipo||"apartado"):orderKind,cliente:cliente||"Mostrador",telefono:$("#o-tel").value.trim(),fecha,
-    modeloId:m?m.id:"",modelo,talla,precio,costo:m?num(m.costo):(prev?num(prev.costo):0),notas:$("#o-notas").value.trim(),
-    entregado:contado&&!prev?true:$("#o-entregado").checked,proximoPago:contado&&!prev?"":$("#o-prox").value,
-    movimientos:movs,stockRef,creado:prev&&prev.creado?prev.creado:Date.now()};
-  const id=editOrderId||uid();
-  if(!save("pedidos",id,data))return;
-  closeOv("#ov-order");
-  const local={id,...data};const i=state.pedidos.findIndex(x=>x.id===id);if(i>=0)state.pedidos[i]=local;else state.pedidos.push(local);
-  if(prev){toast("Cambios guardados");render();return}
-  toast((contado?"Venta ":"Apartado ")+data.numero+" registrado");
-  state.openId=id;state.payType="abono";renderDetail();openOv("#ov-detail");render();
-  if(newMov)showTicket(local,newMov.id)});
+  /* ---- Editar un par existente ---- */
+  if(prev){const x=pares[0];
+    let stockRef=prev.stockRef||null;
+    if(!stockRef||stockRef.modeloId!==(x.m?x.m.id:"")||stockRef.talla!==x.talla){if(stockRef)adjustStock(stockRef.modeloId,stockRef.talla,+1);stockRef=takeStock(x.m,x.talla)}
+    const data={...prev,cliente:cliente||"Mostrador",telefono:tel,fecha,modeloId:x.m?x.m.id:"",modelo:x.modelo,talla:x.talla,precio:x.precio,costo:x.m?num(x.m.costo):num(prev.costo),
+      notas,entregado:$("#o-entregado").checked,proximoPago:orderKind==="contado"?"":$("#o-prox").value,stockRef};
+    delete data.id;if(!save("pedidos",prev.id,data))return;Object.assign(prev,data);closeOv("#ov-order");toast("Cambios guardados");render();return}
+  /* ---- Nuevo pedido: un registro por par, mismo número de pedido ---- */
+  const total=pares.reduce((a,x)=>a+x.precio,0),metodo=$("#o-metodo").value,gid=uid(),numero=nextNumber(),n=pares.length;
+  let rest=contado?total:num($("#o-anticipo").value);
+  if(!contado&&rest>total){toast("El anticipo no puede ser mayor que el total ("+money(total)+").");return}
+  const anticipo=rest,ids=[];
+  pares.forEach((x,i)=>{
+    const movs=[];const part=Math.min(rest,x.precio);
+    if(part>0){rest=Math.round((rest-part)*100)/100;movs.push({id:uid(),fecha,hora:nowHM(),tipo:"abono",monto:part,metodo,nota:contado?"Pago de contado":"Anticipo"+(n>1?" ("+money(anticipo)+" en total)":""),grupo:gid})}
+    const data={numero,par:i+1,pares:n,orden:gid,tipo:orderKind,cliente:cliente||"Mostrador",telefono:tel,fecha,modeloId:x.m?x.m.id:"",modelo:x.modelo,talla:x.talla,
+      precio:x.precio,costo:x.m?num(x.m.costo):0,notas,entregado:contado?true:$("#o-entregado").checked,proximoPago:contado||part>=x.precio?"":$("#o-prox").value,
+      movimientos:movs,stockRef:takeStock(x.m,x.talla),creado:Date.now()+i};
+    const id=uid();if(save("pedidos",id,data)){ids.push(id);if(!state.pedidos.some(q=>q.id===id))state.pedidos.push({id,...data})}});
+  if(!ids.length)return;
+  closeOv("#ov-order");render();
+  toast((contado?"Venta ":"Apartado ")+numero+" registrado"+(n>1?" con "+n+" pares":""));
+  if(n===1){const p=state.pedidos.find(q=>q.id===ids[0]);state.openId=ids[0];state.payType="abono";renderDetail();openOv("#ov-detail");
+    const mv=(p.movimientos||[])[0];if(mv)showTicket(p,mv.id);return}
+  const key=normName(cliente||"Mostrador")||"sin-nombre";
+  openAcct(key);if(anticipo>0)showCuentaTicket(key,gid,true)});
 
 /* ================= Acciones en el detalle ================= */
 function updateOrder(p,patch){const data={...p,...patch};delete data.id;const ok=save("pedidos",p.id,data);if(ok){Object.assign(p,patch);render()}return ok}
@@ -580,15 +631,16 @@ function presentTicket(blob,tel,waText){
 async function showTicket(p,movId){
   let blob;try{blob=await drawTicket(p,movId)}catch(e){toast("No se pudo generar el ticket.");return}
   const c=calc(p);presentTicket(blob,p.telefono,"Hola "+(p.cliente||"")+", te comparto tu ticket de Shepo's Sneaker. "+(c.saldo>0?"Saldo pendiente: "+money(c.saldo)+".":"¡Gracias por tu compra!"))}
-async function showCuentaTicket(key,gid){
+async function showCuentaTicket(key,gid,solo){
   const g=cuentas(false).find(x=>x.key===key);if(!g){toast("No se encontró la cuenta.");return}
-  let blob;try{blob=await drawCuentaTicket(g,gid)}catch(e){toast("No se pudo generar el ticket.");return}
+  let blob;try{blob=await drawCuentaTicket(g,gid,solo)}catch(e){toast("No se pudo generar el ticket.");return}
   const pend=g.items.reduce((a,x)=>a+Math.max(x.c.saldo,0),0);
   presentTicket(blob,g.tel,"Hola "+g.nombre+", te comparto tu ticket de Shepo's Sneaker. "+(pend>0?"Saldo total pendiente: "+money(pend)+".":"¡Tu cuenta está liquidada, gracias por tu compra!"))}
-async function drawCuentaTicket(g,gid){
+async function drawCuentaTicket(g,gid,solo){
   try{await document.fonts.ready}catch(e){}
   const W=576,P=30,B='"Barlow",Arial,sans-serif',D='"Barlow Condensed","Arial Narrow",Arial,sans-serif';
-  const items=g.items.filter(({p,c})=>c.saldo>0||(gid&&(p.movimientos||[]).some(m=>m.grupo===gid)));
+  const inG=p=>gid&&(p.orden===gid||(p.movimientos||[]).some(m=>m.grupo===gid));
+  const items=g.items.filter(({p,c})=>solo?inG(p):(c.saldo>0||inG(p)));
   const pagos=[];for(const {p} of items)for(const m of (p.movimientos||[]))if(gid&&m.grupo===gid)pagos.push({p,m});
   const recibido=pagos.reduce((a,x)=>a+num(x.m.monto),0);const m0=pagos[0]?pagos[0].m:null;
   const c=document.createElement("canvas");c.width=W;c.height=3200;const x=c.getContext("2d");
@@ -598,7 +650,7 @@ async function drawCuentaTicket(g,gid){
   const dash=()=>{y+=16;x.save();x.setLineDash([8,6]);x.lineWidth=2;x.beginPath();x.moveTo(P,y);x.lineTo(W-P,y);x.stroke();x.restore();y+=12};
   const row=(l,r,font,dy)=>{x.font=font;x.textAlign="left";x.fillText(l,P,y+dy);x.textAlign="right";x.fillText(r,W-P,y+dy);x.textAlign="left";y+=dy};
   center("SHEPO'S SNEAKER","800 46px "+D,44);center("Tenis 100% originales","600 24px "+B,32);center("Pedidos y WhatsApp: "+BIZ_PHONE,"500 22px "+B,30);
-  dash();center(gid?"TICKET DE PAGO":"ESTADO DE CUENTA","800 34px "+D,40);
+  dash();center(gid?(solo&&items.every(i=>i.c.saldo<=0)?"TICKET DE VENTA":"TICKET DE PAGO"):"ESTADO DE CUENTA","800 34px "+D,40);
   row("Fecha: "+fdate(m0&&m0.fecha?m0.fecha:today())+" "+(m0&&m0.hora?m0.hora:nowHM()),gid?"Folio C-"+gid.slice(-5).toUpperCase():"","600 22px "+B,34);
   dash();x.font="600 24px "+B;x.fillText("Cliente: "+g.nombre,P,y+32);y+=32;if(g.tel){x.font="500 22px "+B;x.fillText("Tel: "+fphone(g.tel),P,y+28);y+=28}
   dash();x.font="700 22px "+B;x.fillText("ARTÍCULOS",P,y+28);x.textAlign="right";x.fillText("PRECIO",W-P,y+28);x.textAlign="left";y+=34;
@@ -607,7 +659,7 @@ async function drawCuentaTicket(g,gid){
     x.font="600 24px "+B;const lines=wrap(x,itemName(p),W-2*P-150);lines.forEach((ln,i)=>{x.fillText(ln,P,y+30);if(i===0){x.textAlign="right";x.fillText(money(cc.total),W-P,y+30);x.textAlign="left"}y+=30});
     x.font="500 21px "+B;x.fillStyle="#333";x.fillText("Abonado "+money(cc.pagado)+"  ·  "+(cc.saldo>0?"Debe "+money(cc.saldo):"LIQUIDADO"),P,y+27);x.fillStyle="#000";y+=36}
   dash();
-  if(gid){x.fillRect(P,y+6,W-2*P,74);x.fillStyle="#fff";x.font="700 24px "+B;x.fillText("ABONO RECIBIDO",P+16,y+36);x.font="500 20px "+B;x.fillText(m0?(METODOS[m0.metodo]||""):"",P+16,y+64);
+  if(gid){x.fillRect(P,y+6,W-2*P,74);x.fillStyle="#fff";x.font="700 24px "+B;x.fillText(solo&&items.every(i=>i.c.saldo<=0)?"PAGO TOTAL":solo?"ANTICIPO RECIBIDO":"ABONO RECIBIDO",P+16,y+36);x.font="500 20px "+B;x.fillText(m0?(METODOS[m0.metodo]||""):"",P+16,y+64);
     x.font="800 44px "+D;x.textAlign="right";x.fillText(money(recibido),W-P-16,y+60);x.textAlign="left";x.fillStyle="#000";y+=90;
     if(pagos.length>1){x.font="500 21px "+B;x.fillText("Se aplicó a:",P,y+26);y+=28;for(const {p,m} of pagos){row("  "+itemName(p),money(m.monto),"500 21px "+B,28)}}
     dash()}
@@ -675,6 +727,7 @@ function route(){const h=location.hash.replace("#","");state.view=["deudores","c
 window.addEventListener("hashchange",route);
 $("#q-ped").addEventListener("input",e=>{state.qp=e.target.value;renderOrders()});
 $("#q-cat").addEventListener("input",e=>{state.qc=e.target.value;renderCatalog()});
+$("#g-ped").addEventListener("click",e=>{const b=e.target.closest("[data-g]");if(!b)return;state.groupBy=b.dataset.g;$$("#g-ped [data-g]").forEach(x=>x.setAttribute("aria-pressed",x===b));renderOrders()});
 $("#q-debt").addEventListener("input",e=>{state.qd=e.target.value;renderDebts()});
 $("#f-debt").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;state.debtFilter=b.dataset.f;$$("#f-debt .chip").forEach(c=>c.setAttribute("aria-pressed",c===b));renderDebts()});
 $("#btn-deuda").onclick=()=>openDebt();
